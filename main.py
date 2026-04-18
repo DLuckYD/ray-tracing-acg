@@ -88,35 +88,42 @@ class Sphere:
         else:
             return None
 
+    def normal_dotOnRayT(self, hit_point):
+        return Vec3((hit_point.x - self.center.x)/self.radius ,(hit_point.y - self.center.y)/self.radius ,(hit_point.z - self.center.z)/self.radius)
 
 
+def find_closest_hit(ray , spheres):
+    closest_t = None
+    closest_sphere = None
 
-a = Vec3(1, 2, 3)
-b = Vec3(4, 5, 6)
+    for sphere in spheres:
+        t = sphere.intersect(ray)
+        if t is None:
+            continue
 
-print(a + b)          # ожидаешь что-то вроде Vec3(5, 7, 9)
-print(a - b)          # Vec3(-3, -3, -3)
-print(a * 2)          # Vec3(2, 4, 6)
-print(a / 2)          # Vec3(0.5, 1.0, 1.5)
-print(a.dot(b))       # 32
-print(a.length())     # sqrt(14)
-print(a.normalize())  # единичный вектор
+        if  closest_t == None:
+            closest_t = t
+            closest_sphere = sphere
+        elif closest_t > t:
+            closest_t = t
+            closest_sphere = sphere
 
-origin = Vec3(0, 0, 0)
-direction = Vec3(1, 2, 3)
+    return closest_sphere , closest_t
 
-ray = Ray(origin, direction)
+sphere1 = Sphere(Vec3(0, 0, -5), 1)
+sphere2 = Sphere(Vec3(0, 0, -8), 1)
 
-print(ray)
-print(ray.dotOnRayT(0))    # Vec3(0, 0, 0)
-print(ray.dotOnRayT(1))    # Vec3(1, 2, 3)
-print(ray.dotOnRayT(2))    # Vec3(2, 4, 6)
-print(ray.dotOnRayT(0.5))  # Vec3(0.5, 1.0, 1.5)
+spheres = [sphere1, sphere2]
 
-sphere = Sphere(Vec3(0, 0, -5), 1)
-
-ray1 = Ray(Vec3(0, 0, 0), Vec3(0, 0, -1))
-ray2 = Ray(Vec3(0, 0, 0), Vec3(0, 1, 0))
-
-print(sphere.intersect(ray1))
-print(sphere.intersect(ray2))
+ray = Ray(Vec3(0, 0, 0), Vec3(0, 0, -1))
+hit_sphere, t = find_closest_hit(ray, spheres)
+if t != None:
+    hit_point = ray.dotOnRayT(t)
+    print("Hit point",hit_point)
+if(hit_sphere != None):
+    normal = hit_sphere.normal_dotOnRayT(hit_point)
+    print("closest t =", t)
+    print("closest sphere center =", hit_sphere.center if hit_sphere else None)
+    print("normal =",normal)
+else:
+    print("No hit")
