@@ -1,6 +1,8 @@
 import math
 from random import random, randrange
 import array
+from typing import Tuple
+
 from PIL import Image
 
 
@@ -59,9 +61,10 @@ class Ray:
         return self.origin + self.direction * t
 
 class Sphere:
-    def __init__(self, center, radius):
+    def __init__(self, center, radius, color):
         self.center = center
         self.radius = radius
+        self.color = color
 
     def intersect(self, ray):
 
@@ -110,20 +113,63 @@ def find_closest_hit(ray , spheres):
 
     return closest_sphere , closest_t
 
-sphere1 = Sphere(Vec3(0, 0, -5), 1)
-sphere2 = Sphere(Vec3(0, 0, -8), 1)
+def trace_ray(ray, spheres, background_color):
+    hit_sphere, t = find_closest_hit(ray, spheres)
+    if hit_sphere is not None:
+        color = hit_sphere.color
+        return color
+    else:
+        return background_color
+
+def render(width, height, spheres, background_color):
+    image = Image.new("RGB", (width,height))
+    camera_origin = Vec3(0, 0, 0)
+    image_plane_z = -1
+    aspect_ratio = width / height
+    viewport_height = 2.0
+    viewport_width = viewport_height * aspect_ratio
+
+    for y in range(height):
+        print(f"\rRendering row {y + 1} / {height}", end="", flush=True)
+        for x in range(width): #normalize pixels to [0..1]
+            u = (x + 0.5) / width
+            v = (y + 0.5) / height
+
+            screen_x = (u - 0.5) * viewport_width # convert [0..1] to virtual screen
+            screen_y = (0.5 - v) * viewport_height
+
+            pixel_pos = Vec3(screen_x, screen_y, image_plane_z) # pixel on virt screen
+            direction = (pixel_pos - camera_origin).normalize()
+
+            ray = Ray(camera_origin, direction)
+            color = trace_ray(ray, spheres, background_color)
+
+            r = int(max(0, min(255, color.x * 255))) #make separate function
+            g = int(max(0, min(255, color.y * 255)))
+            b = int(max(0, min(255, color.z * 255)))
+
+            image.putpixel((x,y), (r, g, b))
+
+
+
+    image.save("render.png")
+    print()
+    print("Render finished: render.png")
+
+    return image
+
+
+
+
+
+
+
+
+background_color = Vec3(0, 0, 0)
+
+sphere1 = Sphere(Vec3(0, 0, -5), 1, Vec3(1, 0, 0))   # красная сфера
+sphere2 = Sphere(Vec3(2, 0, -8), 1, Vec3(0, 1, 0))   # зелёная сфера
 
 spheres = [sphere1, sphere2]
 
-ray = Ray(Vec3(0, 0, 0), Vec3(0, 0, -1))
-hit_sphere, t = find_closest_hit(ray, spheres)
-if t != None:
-    hit_point = ray.dotOnRayT(t)
-    print("Hit point",hit_point)
-if(hit_sphere != None):
-    normal = hit_sphere.normal_dotOnRayT(hit_point)
-    print("closest t =", t)
-    print("closest sphere center =", hit_sphere.center if hit_sphere else None)
-    print("normal =",normal)
-else:
-    print("No hit")
+render(400, 300, spheres, background_color)
