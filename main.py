@@ -61,10 +61,11 @@ class Ray:
         return self.origin + self.direction * t
 
 class Sphere:
-    def __init__(self, center, radius, color):
+    def __init__(self, center, radius, color, reflection):
         self.center = center
         self.radius = radius
         self.color = color
+        self.reflection = reflection
 
     def intersect(self, ray):
 
@@ -104,7 +105,7 @@ def find_closest_hit(ray , spheres):
         if t is None:
             continue
 
-        if  closest_t == None:
+        if closest_t is None:
             closest_t = t
             closest_sphere = sphere
         elif closest_t > t:
@@ -113,15 +114,37 @@ def find_closest_hit(ray , spheres):
 
     return closest_sphere , closest_t
 
-def trace_ray(ray, spheres, background_color):
+
+def trace_ray(ray, spheres, background_color, light_position):
     hit_sphere, t = find_closest_hit(ray, spheres)
     if hit_sphere is not None:
-        color = hit_sphere.color
+        hit_point = ray.dotOnRayT(t)
+        normal = hit_sphere.normal_dotOnRayT(hit_point)
+        to_light = light_position - hit_point
+        distance_to_light = to_light.length()
+        direction_light = to_light.normalize()
+
+        epsilon = 0.001
+        shadow_origin = hit_point + normal * epsilon
+
+        shadow_ray = Ray(shadow_origin , direction_light)
+        shadow_sphere , shadow_t = find_closest_hit(shadow_ray, spheres)
+
+        if shadow_t is not None and shadow_t < distance_to_light:
+                diffuse = 0
+        else:
+            diffuse = max(0, normal.dot(direction_light))
+
+        ambient_strength = 0.1 #adding some color to black parts of obj
+        light_strength = min(1.0, ambient_strength + diffuse)
+        color = hit_sphere.color * light_strength
+
         return color
     else:
         return background_color
 
-def render(width, height, spheres, background_color):
+
+def render(width, height, spheres, background_color, light_position):
     image = Image.new("RGB", (width,height))
     camera_origin = Vec3(0, 0, 0)
     image_plane_z = -1
@@ -142,7 +165,7 @@ def render(width, height, spheres, background_color):
             direction = (pixel_pos - camera_origin).normalize()
 
             ray = Ray(camera_origin, direction)
-            color = trace_ray(ray, spheres, background_color)
+            color = trace_ray(ray, spheres, background_color, light_position)
 
             r = int(max(0, min(255, color.x * 255))) #make separate function
             g = int(max(0, min(255, color.y * 255)))
@@ -160,16 +183,13 @@ def render(width, height, spheres, background_color):
 
 
 
-
-
-
-
+light_position = Vec3(-6, 4, 0)
 
 background_color = Vec3(0, 0, 0)
 
-sphere1 = Sphere(Vec3(0, 0, -5), 1, Vec3(1, 0, 0))   # красная сфера
-sphere2 = Sphere(Vec3(2, 0, -8), 1, Vec3(0, 1, 0))   # зелёная сфера
+sphere1 = Sphere(Vec3(-0.5, 2, -5), 1.0, Vec3(1, 0, 0))   # красная спереди
+sphere2 = Sphere(Vec3(0.8, 0, -7.0), 1.3, Vec3(0, 1, 0))    # зелёная сзади
 
 spheres = [sphere1, sphere2]
 
-render(400, 300, spheres, background_color)
+render(400, 300, spheres, background_color, light_position)
