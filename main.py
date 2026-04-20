@@ -115,11 +115,43 @@ def find_closest_hit(ray , spheres):
     return closest_sphere , closest_t
 
 
-def trace_ray(ray, spheres, background_color, light_position):
+# def trace_ray(ray, spheres, background_color, light_position):
+#     hit_sphere, t = find_closest_hit(ray, spheres)
+#     if hit_sphere is not None:
+#         hit_point = ray.dotOnRayT(t)
+#         normal = hit_sphere.normal_dotOnRayT(hit_point)
+#         to_light = light_position - hit_point
+#         distance_to_light = to_light.length()
+#         direction_light = to_light.normalize()
+#
+#         epsilon = 0.001
+#         shadow_origin = hit_point + normal * epsilon
+#
+#         shadow_ray = Ray(shadow_origin , direction_light)
+#         shadow_sphere , shadow_t = find_closest_hit(shadow_ray, spheres)
+#
+#         if shadow_t is not None and shadow_t < distance_to_light:
+#                 diffuse = 0
+#         else:
+#             diffuse = max(0, normal.dot(direction_light))
+#
+#         ambient_strength = 0.1 #adding some color to black parts of obj
+#         light_strength = min(1.0, ambient_strength + diffuse)
+#         color = hit_sphere.color * light_strength
+#
+#         return color
+#     else:
+#         return background_color
+
+def trace_ray(ray, spheres, background_color, light_position , depth, max_depth):
+    if depth > max_depth:
+        return background_color #stop recursion
+
     hit_sphere, t = find_closest_hit(ray, spheres)
     if hit_sphere is not None:
         hit_point = ray.dotOnRayT(t)
         normal = hit_sphere.normal_dotOnRayT(hit_point)
+        #SHADOW RAY PART
         to_light = light_position - hit_point
         distance_to_light = to_light.length()
         direction_light = to_light.normalize()
@@ -135,16 +167,24 @@ def trace_ray(ray, spheres, background_color, light_position):
         else:
             diffuse = max(0, normal.dot(direction_light))
 
+        #REFLECTED RAY PART
+        reflected_direction = (ray.direction - normal * (2 * ray.direction.dot(normal))).normalize()
+        reflect_origin = hit_point + normal * epsilon
+
+        reflected_ray = Ray(reflect_origin, reflected_direction)
+        reflected_color = trace_ray(reflected_ray,spheres,background_color,light_position,depth+1,max_depth)
+
+
+        #COLOR PART
         ambient_strength = 0.1 #adding some color to black parts of obj
         light_strength = min(1.0, ambient_strength + diffuse)
-        color = hit_sphere.color * light_strength
-
-        return color
+        local_color = hit_sphere.color * light_strength
+        final_color = local_color * (1- hit_sphere.reflection) + reflected_color * hit_sphere.reflection
+        return final_color
     else:
         return background_color
 
-
-def render(width, height, spheres, background_color, light_position):
+def render(width, height, spheres, background_color, light_position, depth, max_depth):
     image = Image.new("RGB", (width,height))
     camera_origin = Vec3(0, 0, 0)
     image_plane_z = -1
@@ -165,7 +205,7 @@ def render(width, height, spheres, background_color, light_position):
             direction = (pixel_pos - camera_origin).normalize()
 
             ray = Ray(camera_origin, direction)
-            color = trace_ray(ray, spheres, background_color, light_position)
+            color = trace_ray(ray, spheres, background_color, light_position, depth, max_depth)
 
             r = int(max(0, min(255, color.x * 255))) #make separate function
             g = int(max(0, min(255, color.y * 255)))
@@ -187,9 +227,9 @@ light_position = Vec3(-6, 4, 0)
 
 background_color = Vec3(0, 0, 0)
 
-sphere1 = Sphere(Vec3(-0.5, 2, -5), 1.0, Vec3(1, 0, 0))   # красная спереди
-sphere2 = Sphere(Vec3(0.8, 0, -7.0), 1.3, Vec3(0, 1, 0))    # зелёная сзади
+sphere1 = Sphere(Vec3(-0.5, 2, -5), 1.0, Vec3(1, 0, 0) , 0.5)   # красная спереди
+sphere2 = Sphere(Vec3(0.8, 0, -7.0), 1.3, Vec3(0, 1, 0), 0.5)    # зелёная сзади
 
 spheres = [sphere1, sphere2]
 
-render(400, 300, spheres, background_color, light_position)
+render(400, 300, spheres, background_color, light_position, 0 , 4)
