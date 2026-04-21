@@ -132,34 +132,6 @@ def find_closest_hit(ray , objects):
     return closest_object , closest_t
 
 
-# def trace_ray(ray, spheres, background_color, light_position):
-#     hit_sphere, t = find_closest_hit(ray, spheres)
-#     if hit_sphere is not None:
-#         hit_point = ray.dotOnRayT(t)
-#         normal = hit_sphere.normal_dotOnRayT(hit_point)
-#         to_light = light_position - hit_point
-#         distance_to_light = to_light.length()
-#         direction_light = to_light.normalize()
-#
-#         epsilon = 0.001
-#         shadow_origin = hit_point + normal * epsilon
-#
-#         shadow_ray = Ray(shadow_origin , direction_light)
-#         shadow_sphere , shadow_t = find_closest_hit(shadow_ray, spheres)
-#
-#         if shadow_t is not None and shadow_t < distance_to_light:
-#                 diffuse = 0
-#         else:
-#             diffuse = max(0, normal.dot(direction_light))
-#
-#         ambient_strength = 0.1 #adding some color to black parts of obj
-#         light_strength = min(1.0, ambient_strength + diffuse)
-#         color = hit_sphere.color * light_strength
-#
-#         return color
-#     else:
-#         return background_color
-
 def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
     if depth > max_depth:
         return background_color #stop recursion
@@ -258,14 +230,18 @@ sphere2 = Sphere(
 )
 
 plane = Plane(
-    Vec3(0, -2, 0),      # точка на плоскости
-    Vec3(0, 1, 0),       # нормаль вверх
-    Vec3(0.8, 0.8, 0.8), # светло-серый пол
+    Vec3(0, -2, 0),      # dot on plane
+    Vec3(0, 1, 0),       # normal
+    Vec3(0.8, 0.8, 0.8), # color
     0.15
 )
 
 objects = [sphere1, sphere2, plane]
 
 render(400, 300, objects, background_color, light_position, 0, 4)
+
+im = Image.open("render.png")
+im.show("Render")
+
 
 
