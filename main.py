@@ -1,4 +1,5 @@
 import math
+import time
 
 from PIL import Image
 
@@ -58,11 +59,13 @@ class Ray:
         return self.origin + self.direction * t
 
 class Sphere:
-    def __init__(self, center, radius, color, reflection):
+    def __init__(self, center, radius, color, reflection = 0.0, transparency = 0.0, ior = 1.0):
         self.center = center
         self.radius = radius
         self.color = color
         self.reflection = reflection
+        self.transparency = transparency
+        self.ior = ior #index of refraction
 
     def intersect(self, ray):
 
@@ -94,11 +97,13 @@ class Sphere:
 
 class Plane :
 
-    def __init__ (self, point, normal , color, reflection):
+    def __init__ (self, point, normal , color, reflection = 0.0, transparency = 0.0, ior = 1.0):
         self.point = point
         self.normal = normal.normalize()
         self.color = color
         self.reflection = reflection
+        self.transparency = transparency
+        self.ior = ior  # index of refraction
 
     def intersect(self, ray):
         denom = self.normal.dot(ray.direction)
@@ -131,7 +136,6 @@ def find_closest_hit(ray , objects):
 
     return closest_object , closest_t
 
-
 def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
     if depth > max_depth:
         return background_color #stop recursion
@@ -163,12 +167,49 @@ def trace_ray(ray, objects, background_color, light_position , depth, max_depth)
         reflected_ray = Ray(reflect_origin, reflected_direction)
         reflected_color = trace_ray(reflected_ray,objects,background_color,light_position,depth+1,max_depth)
 
+        # REFRACTED RAY PART
+        transparency = hit_object.transparency
+        refracted_color = Vec3(0, 0, 0)
+
+        if transparency > 0:
+            # Checking: the ray enters or exits the object
+            # If dot < 0, the ray enters the object
+            # If dot > 0, the ray exits the object
+            if ray.direction.dot(normal) < 0:
+                refract_normal = normal
+                n1 = 1.0
+                n2 = hit_object.ior
+            else:
+                refract_normal = normal * -1
+                n1 = hit_object.ior
+                n2 = 1.0
+
+            refracted_direction = refract(ray.direction, refract_normal, n1, n2)
+
+            if refracted_direction is not None:
+                refract_origin = hit_point - refract_normal * epsilon
+                refracted_ray = Ray(refract_origin, refracted_direction)
+
+                refracted_color = trace_ray(
+                    refracted_ray,
+                    objects,
+                    background_color,
+                    light_position,
+                    depth + 1,
+                    max_depth
+                )
 
         #COLOR PART
         ambient_strength = 0.1 #adding some color to black parts of obj
         light_strength = min(1.0, ambient_strength + diffuse)
         local_color = hit_object.color * light_strength
-        final_color = local_color * (1- hit_object.reflection) + reflected_color * hit_object.reflection
+        local_weight = max(0.0, 1.0 - hit_object.reflection - hit_object.transparency)
+
+        final_color = (
+                local_color * local_weight
+                + reflected_color * hit_object.reflection
+                + refracted_color * hit_object.transparency
+        )
         return final_color
     else:
         return background_color
@@ -202,44 +243,147 @@ def render(width, height, objects, background_color, light_position, depth, max_
 
             image.putpixel((x,y), (r, g, b))
 
-
-
     image.save("render.png")
     print()
     print("Render finished: render.png")
 
     return image
 
+def refract(direction, normal, n1, n2):
+    direction_norm = direction.normalize()
+    normal_norm = normal.normalize()
+
+    eta = n1 / n2
+    cos_i = -normal_norm.dot(direction_norm)
+
+    k = 1 - eta ** 2  * (1- cos_i**2)
+    if k < 0:
+        return None
+    else:
+        refracted_ray = direction_norm * eta + normal_norm * (eta * cos_i - math.sqrt(k))
+        return refracted_ray.normalize()
+
+def build_final_scene():
+    light_position = Vec3(-14, 12, 6)
+    background_color = Vec3(0.05, 0.08, 0.14)
+
+    objects = []
+
+    # Main central glass sphere
+    objects.append(
+        Sphere(Vec3(0.0, 0.8, -6.0), 1.5, Vec3(0.92, 0.95, 1.0), 0.08, 0.82, 1.5)
+    )
+
+    # Two reflective metallic spheres near the front
+    objects.append(
+        Sphere(Vec3(-1.8, -0.4, -4.8), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(1.8, -0.35, -5.0), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
+    )
+
+    # Large colored spheres around the center
+    objects.append(
+        Sphere(Vec3(-3.8, 0.7, -8.0), 1.15, Vec3(1.0, 0.15, 0.15), 0.18, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(3.9, 0.6, -8.2), 1.15, Vec3(0.15, 1.0, 0.2), 0.18, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(0.0, -0.1, -9.5), 1.25, Vec3(0.2, 0.45, 1.0), 0.22, 0.0, 1.0)
+    )
+
+    # Medium ring of spheres
+    ring_data = [
+        (-5.8, 1.2, -10.0, 0.75, Vec3(1.0, 0.95, 0.1), 0.12),
+        (-4.5, -0.2, -9.2, 0.65, Vec3(1.0, 0.55, 0.05), 0.10),
+        (-2.8, -1.0, -8.4, 0.60, Vec3(0.05, 0.95, 0.95), 0.10),
+        (-0.8, -1.25, -8.0, 0.55, Vec3(0.85, 0.2, 1.0), 0.12),
+        (1.2, -1.2, -8.0, 0.55, Vec3(1.0, 0.4, 0.8), 0.12),
+        (3.0, -0.95, -8.5, 0.60, Vec3(0.0, 0.75, 1.0), 0.10),
+        (4.8, -0.15, -9.3, 0.65, Vec3(0.65, 1.0, 0.1), 0.10),
+        (6.2, 1.15, -10.2, 0.75, Vec3(1.0, 0.1, 0.95), 0.12),
+    ]
+
+    extra_colors = [
+        Vec3(1.0, 0.2, 0.2),
+        Vec3(0.2, 1.0, 0.2),
+        Vec3(0.2, 0.5, 1.0),
+        Vec3(1.0, 0.9, 0.2),
+        Vec3(1.0, 0.2, 0.9),
+        Vec3(0.2, 1.0, 1.0),
+    ]
+
+    scatter_positions = [
+        (-6.5, -1.25, -8.0), (-5.8, -1.15, -8.8), (-5.0, -1.05, -9.6),
+        (-4.2, -1.2, -10.4), (-3.4, -1.1, -11.2), (-2.6, -1.0, -12.0),
+        (2.6, -1.0, -12.0), (3.4, -1.1, -11.2), (4.2, -1.2, -10.4),
+        (5.0, -1.05, -9.6), (5.8, -1.15, -8.8), (6.5, -1.25, -8.0),
+    ]
+
+    for i, (x, y, z) in enumerate(scatter_positions):
+        color = extra_colors[i % len(extra_colors)]
+        objects.append(
+            Sphere(Vec3(x, y, z), 0.22, color, 0.08, 0.0, 1.0)
+        )
+
+    for x, y, z, r, color, refl in ring_data:
+        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
+
+    # Front row of small spheres
+    front_data = [
+        (-4.5, -1.15, -6.6, 0.45, Vec3(1.0, 0.9, 0.2), 0.10),
+        (-3.2, -1.25, -6.2, 0.42, Vec3(0.2, 1.0, 1.0), 0.10),
+        (-1.9, -1.3, -6.0, 0.40, Vec3(1.0, 0.3, 0.3), 0.10),
+        (-0.6, -1.32, -5.9, 0.38, Vec3(0.3, 0.8, 1.0), 0.10),
+        (0.7, -1.3, -6.0, 0.40, Vec3(0.6, 1.0, 0.2), 0.10),
+        (2.0, -1.26, -6.2, 0.42, Vec3(1.0, 0.5, 0.1), 0.10),
+        (3.3, -1.18, -6.6, 0.45, Vec3(1.0, 0.2, 0.8), 0.10),
+    ]
+
+    for x, y, z, r, color, refl in front_data:
+        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
+
+    # Additional transparent accent spheres
+    objects.append(
+        Sphere(Vec3(-2.2, 0.15, -5.9), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
+    )
+    objects.append(
+        Sphere(Vec3(2.4, 0.1, -6.1), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
+    )
+
+    # Back row for more reflections/refractions
+    back_data = [
+        (-7.5, 1.4, -12.0, 0.85, Vec3(0.9, 0.2, 0.2), 0.14),
+        (-5.2, 1.9, -12.8, 0.90, Vec3(0.2, 0.9, 0.3), 0.14),
+        (-2.8, 2.2, -13.2, 0.95, Vec3(0.2, 0.5, 1.0), 0.16),
+        (0.0, 2.35, -13.6, 1.00, Vec3(0.95, 0.9, 0.2), 0.16),
+        (2.8, 2.2, -13.2, 0.95, Vec3(1.0, 0.25, 0.9), 0.16),
+        (5.2, 1.9, -12.8, 0.90, Vec3(0.3, 1.0, 1.0), 0.14),
+        (7.5, 1.4, -12.0, 0.85, Vec3(1.0, 0.55, 0.15), 0.14),
+    ]
+
+    for x, y, z, r, color, refl in back_data:
+        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
+
+    # Floor plane
+    objects.append(
+        Plane(Vec3(0, -1.7, 0), Vec3(0, 1, 0), Vec3(0.78, 0.78, 0.82), 0.22)
+    )
+
+    return objects, background_color, light_position
+
+light_position = Vec3(-8, 8, 2)
+background_color = Vec3(0.08, 0.1, 0.16)
 
 
-light_position = Vec3(-6, 4, 0)
-background_color = Vec3(0, 0, 0)
+objects, background_color, light_position = build_final_scene()
 
-sphere1 = Sphere(
-    Vec3(-0.5, 2, -5),
-    1.0,
-    Vec3(1, 0, 0),
-    0.25
-)
+start_time = time.perf_counter()
+render(1000, 1000, objects, background_color, light_position, 0, 4)
+end_time = time.perf_counter()
 
-sphere2 = Sphere(
-    Vec3(0.8, 0, -7.0),
-    1.3,
-    Vec3(0, 1, 0),
-    0.35
-)
-
-plane = Plane(
-    Vec3(0, -2, 0),      # dot on plane
-    Vec3(0, 1, 0),       # normal
-    Vec3(0.8, 0.8, 0.8), # color
-    0.15
-)
-
-objects = [sphere1, sphere2, plane]
-
-render(400, 300, objects, background_color, light_position, 0, 4)
-
+print(f"Render time: {end_time - start_time:.3f} seconds")
 im = Image.open("render.png")
 im.show("Render")
 
