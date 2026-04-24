@@ -118,23 +118,53 @@ class Plane :
 
 
 
-def find_closest_hit(ray , objects):
+# def find_closest_hit(ray , objects):
+#     closest_t = None
+#     closest_object = None
+#
+#     for object in objects:
+#         t = object.intersect(ray)
+#         if t is None:
+#             continue
+#
+#         if closest_t is None:
+#             closest_t = t
+#             closest_object = object
+#         elif closest_t > t:
+#             closest_t = t
+#             closest_object = object
+#
+#     return closest_object , closest_t
+
+def find_closest_hit(ray, objects, cached_object=None):
     closest_t = None
     closest_object = None
 
-    for object in objects:
-        t = object.intersect(ray)
+    # First test the cached object
+    if cached_object is not None:
+        t = cached_object.intersect(ray)
+        if t is not None:
+            closest_t = t
+            closest_object = cached_object
+
+    # Then test all other objects
+    for obj in objects:
+        if obj is cached_object:
+            continue
+
+        t = obj.intersect(ray)
         if t is None:
             continue
 
         if closest_t is None:
             closest_t = t
-            closest_object = object
-        elif closest_t > t:
+            closest_object = obj
+        elif t < closest_t:
             closest_t = t
-            closest_object = object
+            closest_object = obj
 
-    return closest_object , closest_t
+    return closest_object, closest_t
+
 
 def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
     if depth > max_depth:
@@ -215,33 +245,49 @@ def trace_ray(ray, objects, background_color, light_position , depth, max_depth)
         return background_color
 
 def render(width, height, objects, background_color, light_position, depth, max_depth):
-    image = Image.new("RGB", (width,height))
+    image = Image.new("RGB", (width, height))
     camera_origin = Vec3(0, 0, 0)
     image_plane_z = -1
     aspect_ratio = width / height
     viewport_height = 2.0
     viewport_width = viewport_height * aspect_ratio
 
+    # Cache for the last successfully hit primary object
+    last_hit_object = None
+
     for y in range(height):
         print(f"\rRendering row {y + 1} / {height}", end="", flush=True)
-        for x in range(width): #normalize pixels to [0..1]
+
+        for x in range(width):
+            # Normalize pixel coordinates to [0..1]
             u = (x + 0.5) / width
             v = (y + 0.5) / height
 
-            screen_x = (u - 0.5) * viewport_width # convert [0..1] to virtual screen
+            # Convert [0..1] to image plane coordinates
+            screen_x = (u - 0.5) * viewport_width
             screen_y = (0.5 - v) * viewport_height
 
-            pixel_pos = Vec3(screen_x, screen_y, image_plane_z) # pixel on virt screen
+            # Point on the virtual screen
+            pixel_pos = Vec3(screen_x, screen_y, image_plane_z)
             direction = (pixel_pos - camera_origin).normalize()
 
             ray = Ray(camera_origin, direction)
+
+            # ---------------------------------------------
+            # Primary-ray cache test:
+            # test the previous hit object first
+            # ---------------------------------------------
+            primary_hit_object, _ = find_closest_hit(ray, objects, last_hit_object)
+            last_hit_object = primary_hit_object
+
+            # Full ray tracing as before
             color = trace_ray(ray, objects, background_color, light_position, depth, max_depth)
 
-            r = int(max(0, min(255, color.x * 255))) #make separate function
+            r = int(max(0, min(255, color.x * 255)))
             g = int(max(0, min(255, color.y * 255)))
             b = int(max(0, min(255, color.z * 255)))
 
-            image.putpixel((x,y), (r, g, b))
+            image.putpixel((x, y), (r, g, b))
 
     image.save("render.png")
     print()
@@ -372,10 +418,6 @@ def build_final_scene():
     )
 
     return objects, background_color, light_position
-
-light_position = Vec3(-8, 8, 2)
-background_color = Vec3(0.08, 0.1, 0.16)
-
 
 objects, background_color, light_position = build_final_scene()
 
