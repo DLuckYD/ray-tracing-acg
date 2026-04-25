@@ -358,7 +358,7 @@ def render(width, height, objects, background_color, light_position, depth, max_
                 last_hit_object
             )
 
-            # * update cache for the next primary ray
+            # * update cache for the next primary ray primary_hit_object
             last_hit_object = primary_hit_object   # *
 
             r = int(max(0, min(255, color.x * 255)))
@@ -496,7 +496,40 @@ def build_final_scene():
     )
 
     return objects, background_color, light_position
+def build_cache_benchmark_scene():
+    light_position = Vec3(-8, 8, 4)
+    background_color = Vec3(0.05, 0.07, 0.1)
 
+    objects = []
+
+    # Large foreground spheres to maximize ray coherence
+    objects.append(Sphere(Vec3(-2.8, 0.0, -7.0), 2.2, Vec3(1.0, 0.2, 0.2), 0.0, 0.0, 1.0))
+    objects.append(Sphere(Vec3(0.0, 0.0, -7.5), 2.4, Vec3(0.2, 1.0, 0.2), 0.0, 0.0, 1.0))
+    objects.append(Sphere(Vec3(2.8, 0.0, -7.0), 2.2, Vec3(0.2, 0.4, 1.0), 0.0, 0.0, 1.0))
+
+    # Many small background spheres to make full search expensive
+    small_colors = [
+        Vec3(1.0, 0.9, 0.2),
+        Vec3(1.0, 0.4, 0.2),
+        Vec3(0.2, 1.0, 1.0),
+        Vec3(1.0, 0.2, 0.9),
+        Vec3(0.8, 1.0, 0.2),
+        Vec3(0.4, 0.8, 1.0),
+    ]
+
+    positions = []
+    for row in range(5):
+        for col in range(10):
+            x = -9 + col * 2.0
+            y = 3.5 - row * 1.4
+            z = -14 - row * 0.8
+            positions.append((x, y, z))
+
+    for i, (x, y, z) in enumerate(positions):
+        color = small_colors[i % len(small_colors)]
+        objects.append(Sphere(Vec3(x, y, z), 0.45, color, 0.0, 0.0, 1.0))
+
+    return objects, background_color, light_position
 def benchmark_render(runs, width, height, objects, background_color, light_position, depth, max_depth):
     times = []
 
@@ -523,12 +556,12 @@ def benchmark_render(runs, width, height, objects, background_color, light_posit
 
     return times, average_time
 
-objects, background_color, light_position = build_final_scene()
+objects, background_color, light_position = build_cache_benchmark_scene()
 
 times, average_time = benchmark_render(
     runs=10,
-    width=1000,
-    height=1000,
+    width=200,
+    height=200,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
