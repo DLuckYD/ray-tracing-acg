@@ -95,5 +95,4 @@ This suggests that more advanced acceleration structures, such as uniform grids 
 - optimization effect is limited in Python for the current cache approach
 
 ## Render
-
-<img width="100%" height="100%" alt="render2" src="https://github.com/user-attachments/assets/5ee7af5f-2efb-4bf8-a44c-7ee380c446ea" />
+<img width="1000" height="1000" alt="refactor_1" src="https://github.com/user-attachments/assets/1512a32b-b338-439d-a25c-a5eb9cb46d1f" />
