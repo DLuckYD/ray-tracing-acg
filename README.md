@@ -78,7 +78,7 @@ An initial optimization was implemented by caching the previously hit primary ob
 - without cache: **1.976 s**
 - result: difference was about **0.3%**, effectively within measurement noise
 
-Full benchmark details: see `BENCHMARK_RESULTS.md`.
+Full benchmark details: see [Benchmark Results](./BENCHMARK_RESULTS.md).
 
 ### Conclusion
 
