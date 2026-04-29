@@ -74,6 +74,8 @@ class Sphere:
         self.reflection = reflection
         self.transparency = transparency
         self.ior = ior #index of refraction
+        radius_vec = Vec3(self.radius, self.radius, self.radius)
+        self.aabb = AABB(self.center - radius_vec, self.center + radius_vec)
 
     def intersect(self, ray):
 
@@ -100,6 +102,11 @@ class Sphere:
         else:
             return None
 
+    def get_aabb(self):
+        return self.aabb
+
+
+
     def normal_at(self, hit_point):
         return Vec3((hit_point.x - self.center.x)/self.radius ,(hit_point.y - self.center.y)/self.radius ,(hit_point.z - self.center.z)/self.radius)
 
@@ -121,8 +128,12 @@ class Plane :
         if t <= 0:
             return None
         return t
+
     def normal_at(self, hit_point):
         return self.normal
+
+    def get_aabb(self):
+        return None
 
 class Triangle:
 
@@ -132,8 +143,9 @@ class Triangle:
         self.v2 = v2
         self.color = color
         self.reflection = reflection
-        self.transparency = transparency
+        self. transparency = transparency
         self.ior = ior  # index of refraction
+        self.aabb = self.create_aabb()
 
     def normal_at(self, hit_point):
         edge1 = self.v1 - self.v0
@@ -172,12 +184,74 @@ class Triangle:
 
         return None
 
+    def create_aabb(self):
+        epsilon = 0.000001
+        min_x = min(self.v0.x, self.v1.x, self.v2.x) - epsilon
+        min_y = min(self.v0.y, self.v1.y, self.v2.y) - epsilon
+        min_z = min(self.v0.z, self.v1.z, self.v2.z) - epsilon
+
+        max_x = max(self.v0.x, self.v1.x, self.v2.x) + epsilon
+        max_y = max(self.v0.y, self.v1.y, self.v2.y) + epsilon
+        max_z = max(self.v0.z, self.v1.z, self.v2.z) + epsilon
+
+        min_point = Vec3(min_x, min_y, min_z)
+        max_point = Vec3(max_x, max_y, max_z)
+
+        return AABB(min_point, max_point)
+
+    def get_aabb(self):
+        return self.aabb
+
 
 def find_closest_hit(ray, objects):
+    global use_aabb
+
     closest_t = None
     closest_object = None
 
     for obj in objects:
+
+        if use_aabb:
+            aabb = obj.get_aabb() # First test the object's bounding box
+
+            # If the object has an AABB and the ray does not hit it,
+            # we can skip the expensive exact intersection test
+            if aabb is not None:
+                if not aabb.intersect(ray):
+                    continue
+
+        # Exact intersection test with the real object
+        t = obj.intersect(ray)
+        if t is None:
+            continue
+
+        # Update the nearest hit
+        if closest_t is None:
+            closest_t = t
+            closest_object = obj
+        elif t < closest_t:
+            closest_t = t
+            closest_object = obj
+
+    return closest_object, closest_t
+
+
+def find_closest_hit(ray, objects):
+    global use_aabb
+
+    closest_t = None
+    closest_object = None
+
+    for obj in objects:
+        # Optional AABB test before exact intersection
+        if use_aabb:
+            aabb = obj.get_aabb()
+
+            if aabb is not None:
+                if not aabb.intersect(ray):
+                    continue
+
+        # Exact intersection with the actual object
         t = obj.intersect(ray)
         if t is None:
             continue
@@ -593,6 +667,122 @@ def build_cache_benchmark_scene():
         objects.append(Sphere(Vec3(x, y, z), 0.45, color, 0.0, 0.0, 1.0))
 
     return objects, background_color, light_position
+def build_aabb_benchmark_scene():
+    # Strong directional light
+    light_position = Vec3(-10, 9, 4)
+
+    # Dark blue background
+    background_color = Vec3(0.04, 0.06, 0.10)
+
+    objects = []
+
+    # =========================================================
+    # Large foreground spheres
+    # These create coherent primary hits in the center.
+    # =========================================================
+    objects.append(
+        Sphere(Vec3(-2.4, 0.2, -7.5), 1.5, Vec3(1.0, 0.2, 0.2), 0.0, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(0.0, 0.0, -8.0), 1.7, Vec3(0.2, 1.0, 0.25), 0.0, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(2.6, 0.15, -7.6), 1.45, Vec3(0.2, 0.45, 1.0), 0.0, 0.0, 1.0)
+    )
+
+    # =========================================================
+    # Triangle wall in the far background
+    # AABB should help here, because many rays will reject many triangles.
+    # =========================================================
+    triangle_colors = [
+        Vec3(1.0, 0.85, 0.15),
+        Vec3(1.0, 0.45, 0.20),
+        Vec3(0.2, 1.0, 0.9),
+        Vec3(0.9, 0.2, 1.0),
+        Vec3(0.3, 0.9, 0.25),
+        Vec3(0.2, 0.55, 1.0),
+    ]
+
+    # Grid of triangles in depth
+    idx = 0
+    for row in range(6):
+        for col in range(10):
+            base_x = -10.0 + col * 2.0
+            base_y = 3.5 - row * 1.2
+            base_z = -14.0 - row * 0.6
+
+            color = triangle_colors[idx % len(triangle_colors)]
+            idx += 1
+
+            # Upright triangle
+            objects.append(
+                Triangle(
+                    Vec3(base_x - 0.7, base_y - 0.6, base_z),
+                    Vec3(base_x + 0.7, base_y - 0.5, base_z - 0.1),
+                    Vec3(base_x,       base_y + 0.9, base_z + 0.1),
+                    color,
+                    reflection=0.0,
+                    transparency=0.0,
+                    ior=1.0
+                )
+            )
+
+    # =========================================================
+    # Side triangle groups
+    # These are intentionally placed far on the left/right,
+    # so many central rays should reject them via AABB.
+    # =========================================================
+    for i in range(12):
+        z = -9.0 - i * 0.8
+
+        # Left side
+        objects.append(
+            Triangle(
+                Vec3(-11.5, -1.4, z),
+                Vec3(-9.8,  0.2, z - 0.2),
+                Vec3(-10.6, 1.8, z + 0.1),
+                Vec3(1.0, 0.8, 0.15),
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+        # Right side
+        objects.append(
+            Triangle(
+                Vec3(11.5, -1.3, z),
+                Vec3(9.7,   0.1, z - 0.2),
+                Vec3(10.5,  1.7, z + 0.2),
+                Vec3(0.2, 0.85, 1.0),
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+    # =========================================================
+    # Small triangle band near the lower background
+    # This increases the object count significantly.
+    # =========================================================
+    for i in range(20):
+        x = -9.5 + i * 1.0
+        z = -11.0 - (i % 4) * 0.5
+        color = triangle_colors[i % len(triangle_colors)]
+
+        objects.append(
+            Triangle(
+                Vec3(x - 0.35, -1.8, z),
+                Vec3(x + 0.35, -1.8, z),
+                Vec3(x,        -0.9, z + 0.1),
+                color,
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+    return objects, background_color, light_position
 def benchmark_render(runs, width, height, objects, background_color, light_position, depth, max_depth):
     times = []
 
@@ -648,30 +838,99 @@ def is_shadow_blocked(shadow_ray, objects, distance_to_light):
     # 3. Nothing blocks the light
     return False
 
-objects, background_color, light_position = build_final_scene()
+class AABB:
+    def __init__(self, min_point, max_point):
+        self.min_point = min_point
+        self.max_point = max_point
 
-triangle1 = Triangle(
-    Vec3(-1.5, -1.0, -6.0),
-    Vec3(1.5, -1.0, -6.0),
-    Vec3(0.0, 5, -6.0),
-    Vec3(1.0, 0.3, 0.3),
-    reflection=0.0,
-    transparency=0.70,
-    ior=1.0
-)
+    def intersect(self, ray):
+        # Small epsilon to avoid division issues when direction is very close to zero
+        epsilon = 0.000001
 
-objects.append(triangle1)
+        # ---------------------------------------------------------
+        # X slab
+        # ---------------------------------------------------------
+        # If the ray is almost parallel to the X planes,
+        # then it can hit the box only if its origin.x is already inside the slab.
+        if abs(ray.direction.x) < epsilon:
+            if ray.origin.x < self.min_point.x or ray.origin.x > self.max_point.x:
+                return False
+            tx_min = -float("inf")
+            tx_max = float("inf")
+        else:
+            tx1 = (self.min_point.x - ray.origin.x) / ray.direction.x
+            tx2 = (self.max_point.x - ray.origin.x) / ray.direction.x
+
+            # tx_min is the entry distance for X, tx_max is the exit distance
+            tx_min = min(tx1, tx2)
+            tx_max = max(tx1, tx2)
+
+        # ---------------------------------------------------------
+        # Y slab
+        # ---------------------------------------------------------
+        if abs(ray.direction.y) < epsilon:
+            if ray.origin.y < self.min_point.y or ray.origin.y > self.max_point.y:
+                return False
+            ty_min = -float("inf")
+            ty_max = float("inf")
+        else:
+            ty1 = (self.min_point.y - ray.origin.y) / ray.direction.y
+            ty2 = (self.max_point.y - ray.origin.y) / ray.direction.y
+
+            ty_min = min(ty1, ty2)
+            ty_max = max(ty1, ty2)
+
+        # ---------------------------------------------------------
+        # Z slab
+        # ---------------------------------------------------------
+        if abs(ray.direction.z) < epsilon:
+            if ray.origin.z < self.min_point.z or ray.origin.z > self.max_point.z:
+                return False
+            tz_min = -float("inf")
+            tz_max = float("inf")
+        else:
+            tz1 = (self.min_point.z - ray.origin.z) / ray.direction.z
+            tz2 = (self.max_point.z - ray.origin.z) / ray.direction.z
+
+            tz_min = min(tz1, tz2)
+            tz_max = max(tz1, tz2)
+
+        # ---------------------------------------------------------
+        # Combine intervals from X, Y, Z
+        # ---------------------------------------------------------
+        # The ray must be inside all three slab intervals at the same time.
+        t_enter = max(tx_min, ty_min, tz_min)
+        t_exit = min(tx_max, ty_max, tz_max)
+
+        # If entry is after exit, intervals do not overlap -> no hit
+        if t_enter > t_exit:
+            return False
+
+        # If the whole box is behind the ray origin, we also reject it
+        if t_exit < 0:
+            return False
+
+        return True
+
+objects, background_color, light_position = build_aabb_benchmark_scene()
+
+
+# Global feature flags
+use_aabb = True
+blocker_cache_object = None
 
 times, average_time = benchmark_render(
     runs=1,
-    width=2000,
-    height=3000,
+    width=1200,
+    height=1200,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
     depth=0,
     max_depth=4
 )
+
+
 
 im = Image.open("render.png")
 im.show("Render")

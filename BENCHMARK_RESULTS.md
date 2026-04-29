@@ -2,106 +2,72 @@
 
 ## Overview
 
-This file summarizes the benchmark results collected for the current Python ray tracer implementation.
+This file summarizes the benchmark results for the current Python ray tracer implementation after introducing **AABB (Axis-Aligned Bounding Boxes)**.
 
-All measurements were performed on the same machine using the same codebase and benchmark setup for each comparison.
+All measurements were performed on the same machine using the same codebase and the same benchmark scene for each comparison.
 
 ## Benchmark Setup
 
-### Scene A — Final complex scene
-Features:
-- many objects
-- reflections
-- refractions
-- shadow rays
-- floor plane
-- recursive ray tracing
+### Scene A — AABB Benchmark Scene
 
-### Scene B — Simplified cache benchmark scene
 Features:
-- large opaque foreground spheres
-- many small background spheres
-- designed to increase primary-ray coherence
-- used to test the effect of primary-ray hit caching
-
+- many triangles
+- several large foreground spheres
+- no transparent materials in the benchmark focus
+- designed to test object-level bounding box rejection
+- resolution: **500 x 500**
+- number of runs: **10**
+- 
+![aabb_test.png](aabb_test.png)
 ## Tested Optimization
 
-A simple cache-based optimization was implemented for **primary rays**.
+An **AABB-based acceleration step** was added to the ray-object search.
 
-The idea was to:
-- store the previously hit primary object
-- test that object first for the next primary ray
-- then continue with the full nearest-hit search over the remaining objects
+The idea is:
+- each object provides its own bounding box
+- the ray first tests the AABB
+- only if the AABB is hit, the exact object intersection is computed
+
+This reduces unnecessary exact intersection tests, especially for triangles and objects outside the main ray path.
 
 ## Results
 
-### Scene A — Final complex scene
+### Scene A — AABB Benchmark Scene
 
-Without cache:
-- **166.252 s**
+Without AABB:
+- **39.851 s**
 
-With cache:
-- **174.204 s**
-
-Difference:
-- cache version was **7.952 s slower**
-- approximately **4.8% slower**
-
-Interpretation:
-- the cache did not improve performance on the complex scene
-- the scene cost is dominated by secondary rays such as shadows, reflections, and refractions
-- the extra Python-level cache logic outweighed the benefit
-
----
-
-### Scene B — Simplified cache benchmark scene
-
-Without cache:
-- **2.375 s**
-
-With cache:
-- **2.349 s**
+With AABB:
+- **31.788 s**
 
 Difference:
-- cache version was **0.026 s faster**
-- approximately **1.1% faster**
+- AABB version was **8.063 s faster**
+- approximately **20.2% faster**
 
-Interpretation:
-- the cache produced a small positive effect
-- neighboring primary rays were coherent enough to benefit slightly
-- however, the improvement remained very small
+## Interpretation
 
----
+The AABB optimization produced a clear performance improvement in the current benchmark scene.
 
-### Scene C — Repeated simplified benchmark
-
-With cache:
-- **1.982 s**
-
-Without cache:
-- **1.976 s**
-
-Difference:
-- cache version was **0.006 s slower**
-- approximately **0.3% slower**
-
-Interpretation:
-- the result is effectively within the measurement noise range
-- no stable or significant performance improvement was observed
+Main observations:
+- the ray tracer became significantly faster once AABBs were precomputed and reused
+- the key implementation detail was to compute each object's AABB only once and return the stored box instead of rebuilding it during every intersection query
+- triangle-heavy scenes benefit more from AABB than sphere-dominated scenes
+- object-level rejection is already strong enough to produce a visible speedup in Python
 
 ## General Conclusion
 
-The cache-based optimization was implemented correctly from a functional point of view, but in the current Python implementation it did not provide a stable or meaningful speedup.
+AABB is the first acceleration method in the project that showed a **clear and stable improvement**.
 
-Main observations:
-- on the complex scene, the cache made performance worse
-- on the simplified scene, the cache showed either a very small speedup or a result within noise range
-- the optimization effect is limited because the cache only helps primary rays, while complex scenes spend a large amount of time on secondary rays
-- Python overhead reduces the practical benefit of this simple strategy
+Compared to the earlier cache-based optimization, AABB is much more effective because it reduces the number of expensive exact intersection tests instead of only trying to guess a good first candidate.
+
+The current result suggests that the next logical steps are:
+- hierarchical bounding volumes (HBV / BVH-like structures)
+- spatial partitioning structures
+- kd-trees or related acceleration trees
 
 ## Next Step
 
-The current results suggest that more advanced acceleration structures are more promising for future optimization work, for example:
-- uniform grids
-- spatial partitioning
-- other scene acceleration methods discussed in later lectures
+Planned continuation:
+- keep AABB as the new baseline optimization
+- experiment with hierarchical bounding volumes
+- then investigate tree-based acceleration structures such as kd-trees
