@@ -333,17 +333,25 @@ def refract(direction, normal, n1, n2):
         return refracted_ray.normalize()
 
 def build_final_scene():
+    # Main light source
     light_position = Vec3(-14, 12, 6)
+
+    # Background color
     background_color = Vec3(0.05, 0.08, 0.14)
 
+    # Scene object container
     objects = []
+
+    # =========================================================
+    # Main hero objects
+    # =========================================================
 
     # Main central glass sphere
     objects.append(
         Sphere(Vec3(0.0, 0.8, -6.0), 1.5, Vec3(0.92, 0.95, 1.0), 0.08, 0.82, 1.5)
     )
 
-    # Two reflective metallic spheres near the front
+    # Two reflective metallic spheres near the camera
     objects.append(
         Sphere(Vec3(-1.8, -0.4, -4.8), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
     )
@@ -351,7 +359,10 @@ def build_final_scene():
         Sphere(Vec3(1.8, -0.35, -5.0), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
     )
 
+    # =========================================================
     # Large colored spheres around the center
+    # =========================================================
+
     objects.append(
         Sphere(Vec3(-3.8, 0.7, -8.0), 1.15, Vec3(1.0, 0.15, 0.15), 0.18, 0.0, 1.0)
     )
@@ -362,7 +373,10 @@ def build_final_scene():
         Sphere(Vec3(0.0, -0.1, -9.5), 1.25, Vec3(0.2, 0.45, 1.0), 0.22, 0.0, 1.0)
     )
 
+    # =========================================================
     # Medium ring of spheres
+    # =========================================================
+
     ring_data = [
         (-5.8, 1.2, -10.0, 0.75, Vec3(1.0, 0.95, 0.1), 0.12),
         (-4.5, -0.2, -9.2, 0.65, Vec3(1.0, 0.55, 0.05), 0.10),
@@ -373,6 +387,13 @@ def build_final_scene():
         (4.8, -0.15, -9.3, 0.65, Vec3(0.65, 1.0, 0.1), 0.10),
         (6.2, 1.15, -10.2, 0.75, Vec3(1.0, 0.1, 0.95), 0.12),
     ]
+
+    for x, y, z, r, color, refl in ring_data:
+        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
+
+    # =========================================================
+    # Small scattered spheres in the lower middle depth
+    # =========================================================
 
     extra_colors = [
         Vec3(1.0, 0.2, 0.2),
@@ -396,10 +417,10 @@ def build_final_scene():
             Sphere(Vec3(x, y, z), 0.22, color, 0.08, 0.0, 1.0)
         )
 
-    for x, y, z, r, color, refl in ring_data:
-        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
-
+    # =========================================================
     # Front row of small spheres
+    # =========================================================
+
     front_data = [
         (-4.5, -1.15, -6.6, 0.45, Vec3(1.0, 0.9, 0.2), 0.10),
         (-3.2, -1.25, -6.2, 0.42, Vec3(0.2, 1.0, 1.0), 0.10),
@@ -413,7 +434,10 @@ def build_final_scene():
     for x, y, z, r, color, refl in front_data:
         objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
 
+    # =========================================================
     # Additional transparent accent spheres
+    # =========================================================
+
     objects.append(
         Sphere(Vec3(-2.2, 0.15, -5.9), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
     )
@@ -421,7 +445,10 @@ def build_final_scene():
         Sphere(Vec3(2.4, 0.1, -6.1), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
     )
 
-    # Back row for more reflections/refractions
+    # =========================================================
+    # Back row of spheres for depth and reflections
+    # =========================================================
+
     back_data = [
         (-7.5, 1.4, -12.0, 0.85, Vec3(0.9, 0.2, 0.2), 0.14),
         (-5.2, 1.9, -12.8, 0.90, Vec3(0.2, 0.9, 0.3), 0.14),
@@ -435,10 +462,101 @@ def build_final_scene():
     for x, y, z, r, color, refl in back_data:
         objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
 
+    # =========================================================
+    # Triangles: large background accents
+    # =========================================================
+
+    # Large warm triangle behind the left side
+    objects.append(
+        Triangle(
+            Vec3(-6.8, -1.2, -11.5),
+            Vec3(-3.2, 2.8, -11.8),
+            Vec3(-1.8, -1.4, -10.8),
+            Vec3(1.0, 0.55, 0.15),
+            reflection=0.08,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Large cool triangle behind the right side
+    objects.append(
+        Triangle(
+            Vec3(2.2, -1.3, -11.0),
+            Vec3(4.8, 2.7, -12.0),
+            Vec3(7.2, -1.1, -11.6),
+            Vec3(0.15, 0.7, 1.0),
+            reflection=0.08,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Central decorative triangle in the far background
+    objects.append(
+        Triangle(
+            Vec3(-1.2, 0.0, -13.8),
+            Vec3(1.4, 0.2, -13.6),
+            Vec3(0.1, 3.2, -14.2),
+            Vec3(0.95, 0.3, 0.85),
+            reflection=0.10,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
+    # Small foreground triangle accents
+    # =========================================================
+
+    # Left foreground triangle
+    objects.append(
+        Triangle(
+            Vec3(-3.4, -1.45, -5.4),
+            Vec3(-2.6, -0.55, -5.6),
+            Vec3(-1.9, -1.45, -5.8),
+            Vec3(1.0, 0.95, 0.2),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Right foreground triangle
+    objects.append(
+        Triangle(
+            Vec3(2.0, -1.45, -5.6),
+            Vec3(2.8, -0.45, -5.7),
+            Vec3(3.7, -1.45, -5.5),
+            Vec3(0.2, 1.0, 0.95),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Small central triangle below the glass sphere
+    objects.append(
+        Triangle(
+            Vec3(-0.7, -1.35, -5.1),
+            Vec3(0.0, -0.35, -5.2),
+            Vec3(0.8, -1.35, -5.0),
+            Vec3(1.0, 0.35, 0.25),
+            reflection=0.15,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
     # Floor plane
+    # =========================================================
+
     objects.append(
         Plane(Vec3(0, -1.7, 0), Vec3(0, 1, 0), Vec3(0.78, 0.78, 0.82), 0.22)
     )
+
+    return objects, background_color, light_position
 
     return objects, background_color, light_position
 def build_cache_benchmark_scene():
@@ -530,9 +648,6 @@ def is_shadow_blocked(shadow_ray, objects, distance_to_light):
     # 3. Nothing blocks the light
     return False
 
-
-
-
 objects, background_color, light_position = build_final_scene()
 
 triangle1 = Triangle(
@@ -549,8 +664,8 @@ objects.append(triangle1)
 
 times, average_time = benchmark_render(
     runs=1,
-    width=200,
-    height=500,
+    width=2000,
+    height=3000,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
