@@ -47,6 +47,14 @@ class Vec3:
             return Vec3(0.0, 0.0, 0.0);
         return self / length_vec
 
+    def cross(self, other): #vec multiplication
+        return Vec3(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x
+        )
+
+
 class Ray:
     def __init__ (self, origin, direction):
         self.origin = origin
@@ -115,6 +123,54 @@ class Plane :
         return t
     def normal_at(self, hit_point):
         return self.normal
+
+class Triangle:
+
+    def __init__(self, v0 ,v1 , v2, color, reflection = 0.0, transparency = 0.0, ior = 1.0):
+        self.v0 = v0
+        self.v1 = v1
+        self.v2 = v2
+        self.color = color
+        self.reflection = reflection
+        self.transparency = transparency
+        self.ior = ior  # index of refraction
+
+    def normal_at(self, hit_point):
+        edge1 = self.v1 - self.v0
+        edge2 = self.v2 - self.v0
+        return edge1.cross(edge2).normalize()
+
+    def intersect(self, ray):
+        epsilon = 0.000001
+
+        edge1 = self.v1 - self.v0
+        edge2 = self.v2 - self.v0
+
+        pvec = ray.direction.cross(edge2)
+        det = edge1.dot(pvec)
+
+        if abs(det) < epsilon:
+            return None
+
+        inv_det = 1.0 / det
+        tvec = ray.origin - self.v0
+
+        u = tvec.dot(pvec) * inv_det
+        if u < 0.0 or u > 1.0:
+            return None
+
+        qvec = tvec.cross(edge1)
+
+        v = ray.direction.dot(qvec) * inv_det
+        if v < 0.0 or (u + v) > 1.0:
+            return None
+
+        t = edge2.dot(qvec) * inv_det
+
+        if t > epsilon:
+            return t
+
+        return None
 
 
 def find_closest_hit(ray, objects):
@@ -479,9 +535,21 @@ def is_shadow_blocked(shadow_ray, objects, distance_to_light):
 
 objects, background_color, light_position = build_final_scene()
 
+triangle1 = Triangle(
+    Vec3(-1.5, -1.0, -6.0),
+    Vec3(1.5, -1.0, -6.0),
+    Vec3(0.0, 5, -6.0),
+    Vec3(1.0, 0.3, 0.3),
+    reflection=0.0,
+    transparency=0.70,
+    ior=1.0
+)
+
+objects.append(triangle1)
+
 times, average_time = benchmark_render(
     runs=1,
-    width=400,
+    width=200,
     height=500,
     objects=objects,
     background_color=background_color,
