@@ -117,22 +117,11 @@ class Plane :
         return self.normal
 
 
-def find_closest_hit(ray, objects, cached_object=None):
+def find_closest_hit(ray, objects):
     closest_t = None
     closest_object = None
 
-    # First test the cached object
-    if cached_object is not None:
-        t = cached_object.intersect(ray)
-        if t is not None:
-            closest_t = t
-            closest_object = cached_object
-
-    # Then test all other objects
     for obj in objects:
-        if obj is cached_object:
-            continue
-
         t = obj.intersect(ray)
         if t is None:
             continue
@@ -147,99 +136,15 @@ def find_closest_hit(ray, objects, cached_object=None):
     return closest_object, closest_t
 
 
-# def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
-#     if depth > max_depth:
-#         return background_color #stop recursion
-#
-#     hit_object, t = find_closest_hit(ray, objects)
-#     if hit_object is not None:
-#         hit_point = ray.dotOnRayT(t)
-#         normal = hit_object.normal_at(hit_point)
-#         #SHADOW RAY PART
-#         to_light = light_position - hit_point
-#         distance_to_light = to_light.length()
-#         direction_light = to_light.normalize()
-#
-#         epsilon = 0.001
-#         shadow_origin = hit_point + normal * epsilon
-#
-#         shadow_ray = Ray(shadow_origin , direction_light)
-#         shadow_sphere , shadow_t = find_closest_hit(shadow_ray, objects)
-#
-#         if shadow_t is not None and shadow_t < distance_to_light:
-#                 diffuse = 0
-#         else:
-#             diffuse = max(0, normal.dot(direction_light))
-#
-#         #REFLECTED RAY PART
-#         reflected_direction = (ray.direction - normal * (2 * ray.direction.dot(normal))).normalize()
-#         reflect_origin = hit_point + normal * epsilon
-#
-#         reflected_ray = Ray(reflect_origin, reflected_direction)
-#         reflected_color = trace_ray(reflected_ray,objects,background_color,light_position,depth+1,max_depth)
-#
-#         # REFRACTED RAY PART
-#         transparency = hit_object.transparency
-#         refracted_color = Vec3(0, 0, 0)
-#
-#         if transparency > 0:
-#             # Checking: the ray enters or exits the object
-#             # If dot < 0, the ray enters the object
-#             # If dot > 0, the ray exits the object
-#             if ray.direction.dot(normal) < 0:
-#                 refract_normal = normal
-#                 n1 = 1.0
-#                 n2 = hit_object.ior
-#             else:
-#                 refract_normal = normal * -1
-#                 n1 = hit_object.ior
-#                 n2 = 1.0
-#
-#             refracted_direction = refract(ray.direction, refract_normal, n1, n2)
-#
-#             if refracted_direction is not None:
-#                 refract_origin = hit_point - refract_normal * epsilon
-#                 refracted_ray = Ray(refract_origin, refracted_direction)
-#
-#                 refracted_color = trace_ray(
-#                     refracted_ray,
-#                     objects,
-#                     background_color,
-#                     light_position,
-#                     depth + 1,
-#                     max_depth
-#                 )
-#
-#         #COLOR PART
-#         ambient_strength = 0.1 #adding some color to black parts of obj
-#         light_strength = min(1.0, ambient_strength + diffuse)
-#         local_color = hit_object.color * light_strength
-#         local_weight = max(0.0, 1.0 - hit_object.reflection - hit_object.transparency)
-#
-#         final_color = (
-#                 local_color * local_weight
-#                 + reflected_color * hit_object.reflection
-#                 + refracted_color * hit_object.transparency
-#         )
-#         return final_color
-#     else:
-#         return background_color
-
-def trace_ray(ray, objects, background_color, light_position, depth, max_depth, cached_object=None):
+def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
     if depth > max_depth:
-        return background_color, None  # * stop recursion and return tuple
+        return background_color #stop recursion
 
-    # * Use cached object only for primary rays (depth == 0)
-    if depth == 0:
-        hit_object, t = find_closest_hit(ray, objects, cached_object)  # *
-    else:
-        hit_object, t = find_closest_hit(ray, objects)  # *
-
+    hit_object, t = find_closest_hit(ray, objects)
     if hit_object is not None:
         hit_point = ray.dotOnRayT(t)
         normal = hit_object.normal_at(hit_point)
-
-        # SHADOW RAY PART
+        #SHADOW RAY PART
         to_light = light_position - hit_point
         distance_to_light = to_light.length()
         direction_light = to_light.normalize()
@@ -247,27 +152,20 @@ def trace_ray(ray, objects, background_color, light_position, depth, max_depth, 
         epsilon = 0.001
         shadow_origin = hit_point + normal * epsilon
 
-        shadow_ray = Ray(shadow_origin, direction_light)
-        shadow_object, shadow_t = find_closest_hit(shadow_ray, objects)
+        shadow_ray = Ray(shadow_origin , direction_light)
+        blocked = is_shadow_blocked(shadow_ray, objects, distance_to_light)
 
-        if shadow_t is not None and shadow_t < distance_to_light:
+        if blocked:
             diffuse = 0
         else:
             diffuse = max(0, normal.dot(direction_light))
 
-        # REFLECTED RAY PART
+        #REFLECTED RAY PART
         reflected_direction = (ray.direction - normal * (2 * ray.direction.dot(normal))).normalize()
         reflect_origin = hit_point + normal * epsilon
 
         reflected_ray = Ray(reflect_origin, reflected_direction)
-        reflected_color, _ = trace_ray(  # * unpack only color, ignore returned object
-            reflected_ray,
-            objects,
-            background_color,
-            light_position,
-            depth + 1,
-            max_depth
-        )
+        reflected_color = trace_ray(reflected_ray,objects,background_color,light_position,depth+1,max_depth)
 
         # REFRACTED RAY PART
         transparency = hit_object.transparency
@@ -292,7 +190,7 @@ def trace_ray(ray, objects, background_color, light_position, depth, max_depth, 
                 refract_origin = hit_point - refract_normal * epsilon
                 refracted_ray = Ray(refract_origin, refracted_direction)
 
-                refracted_color, _ = trace_ray(  # * unpack only color, ignore returned object
+                refracted_color = trace_ray(
                     refracted_ray,
                     objects,
                     background_color,
@@ -301,21 +199,21 @@ def trace_ray(ray, objects, background_color, light_position, depth, max_depth, 
                     max_depth
                 )
 
-        # COLOR PART
-        ambient_strength = 0.1
+        #COLOR PART
+        ambient_strength = 0.1 #adding some color to black parts of obj
         light_strength = min(1.0, ambient_strength + diffuse)
         local_color = hit_object.color * light_strength
         local_weight = max(0.0, 1.0 - hit_object.reflection - hit_object.transparency)
 
         final_color = (
-            local_color * local_weight
-            + reflected_color * hit_object.reflection
-            + refracted_color * hit_object.transparency
+                local_color * local_weight
+                + reflected_color * hit_object.reflection
+                + refracted_color * hit_object.transparency
         )
-
-        return final_color, hit_object  # * return both color and hit object for cache update
+        return final_color
     else:
-        return background_color, None  # * no hit -> return tuple
+        return background_color
+
 
 def render(width, height, objects, background_color, light_position, depth, max_depth):
     image = Image.new("RGB", (width, height))
@@ -324,9 +222,6 @@ def render(width, height, objects, background_color, light_position, depth, max_
     aspect_ratio = width / height
     viewport_height = 2.0
     viewport_width = viewport_height * aspect_ratio
-
-    # Cache for the last successfully hit primary object
-    last_hit_object = None
 
     for y in range(height):
         print(f"\rRendering row {y + 1} / {height}", end="", flush=True)
@@ -346,20 +241,14 @@ def render(width, height, objects, background_color, light_position, depth, max_
 
             ray = Ray(camera_origin, direction)
 
-            # * trace_ray now uses cached_object internally for depth == 0
-            # * and returns both the final color and the primary hit object
-            color, primary_hit_object = trace_ray(
+            color = trace_ray(
                 ray,
                 objects,
                 background_color,
                 light_position,
                 depth,
-                max_depth,
-                last_hit_object
+                max_depth
             )
-
-            # * update cache for the next primary ray primary_hit_object
-            last_hit_object = primary_hit_object   # *
 
             r = int(max(0, min(255, color.x * 255)))
             g = int(max(0, min(255, color.y * 255)))
@@ -535,6 +424,8 @@ def benchmark_render(runs, width, height, objects, background_color, light_posit
 
     for i in range(runs):
         print(f"\nStarting run {i + 1} / {runs}")
+        global blocker_cache_object
+        blocker_cache_object = None
 
         start_time = time.perf_counter()
         render(width, height, objects, background_color, light_position, depth, max_depth)
@@ -556,12 +447,42 @@ def benchmark_render(runs, width, height, objects, background_color, light_posit
 
     return times, average_time
 
-objects, background_color, light_position = build_cache_benchmark_scene()
+
+
+def is_shadow_blocked(shadow_ray, objects, distance_to_light):
+    global blocker_cache_object
+
+    # 1. First test the object stored in the blocker cache
+    if blocker_cache_object is not None:
+        t = blocker_cache_object.intersect(shadow_ray)
+
+        if t is not None and t < distance_to_light:
+            return True
+
+    # 2. If the cached object did not block the light,
+    #    test all other objects
+    for obj in objects:
+        if obj is blocker_cache_object:
+            continue
+
+        t = obj.intersect(shadow_ray)
+
+        if t is not None and t < distance_to_light:
+            blocker_cache_object = obj
+            return True
+
+    # 3. Nothing blocks the light
+    return False
+
+
+
+
+objects, background_color, light_position = build_final_scene()
 
 times, average_time = benchmark_render(
-    runs=10,
-    width=200,
-    height=200,
+    runs=1,
+    width=400,
+    height=500,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
