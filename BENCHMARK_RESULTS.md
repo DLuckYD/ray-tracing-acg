@@ -17,7 +17,6 @@ Features:
 - designed to test object-level bounding box rejection
 - resolution: **500 x 500**
 - number of runs: **10**
-- 
 ![aabb_test.png](aabb_test.png)
 ## Tested Optimization
 
@@ -65,9 +64,98 @@ The current result suggests that the next logical steps are:
 - spatial partitioning structures
 - kd-trees or related acceleration trees
 
-## Next Step
+## Extended Benchmark Comparison
 
-Planned continuation:
-- keep AABB as the new baseline optimization
-- experiment with hierarchical bounding volumes
-- then investigate tree-based acceleration structures such as kd-trees
+After the initial AABB benchmark, an additional comparison was performed on a more realistic scene containing reflective objects, transparent objects, spheres, triangles, and a floor plane.
+
+### Scene B — Realistic Benchmark Scene
+
+Features:
+- reflective spheres
+- transparent spheres
+- multiple triangles
+- floor plane
+- more realistic spatial distribution of objects
+- recursive ray tracing enabled
+- resolution: **300 x 300**
+- number of runs: **10**
+
+![bvh.png](bvh.png)
+## Tested Methods
+
+Three intersection search strategies were compared:
+
+- **Brute Force**  
+  Every ray tests all objects directly.
+
+- **AABB**  
+  Each object provides a precomputed axis-aligned bounding box.  
+  The ray first tests the AABB and only then performs the exact object intersection.
+
+- **BVH**  
+  Objects with finite AABBs are grouped into a bounding volume hierarchy.  
+  Rays first traverse the hierarchy and only test exact object intersections inside relevant leaf nodes.
+
+## Results
+
+### BVH
+
+Average render time:
+- **15.929 s**
+
+### AABB
+
+Average render time:
+- **31.422 s**
+
+### Brute Force
+
+Average render time:
+- **34.940 s**
+
+## Direct Comparison
+
+### AABB vs Brute Force
+
+Difference:
+- AABB was **3.518 s faster**
+- approximately **10.1% faster**
+
+### BVH vs AABB
+
+Difference:
+- BVH was **15.493 s faster**
+- approximately **49.3% faster**
+
+### BVH vs Brute Force
+
+Difference:
+- BVH was **19.011 s faster**
+- approximately **54.4% faster**
+
+## Interpretation
+
+The new benchmark shows a clear hierarchy of effectiveness:
+
+- **Brute Force** is the slowest approach because every ray tests all objects directly.
+- **AABB** improves performance by rejecting some objects before exact intersection tests, but on this realistic scene the gain remains moderate.
+- **BVH** provides the strongest result because it rejects entire groups of objects at once and drastically reduces the number of exact intersection tests.
+
+This confirms that:
+
+- object-level AABB is useful as a first optimization step,
+- but hierarchical grouping of objects is significantly more powerful,
+- especially in scenes with many objects distributed across different depths and heights.
+
+## Updated General Conclusion
+
+The benchmark progression now shows a clear development path:
+
+1. **Brute Force** provides the baseline but scales poorly.
+2. **AABB** gives a measurable improvement and serves as a necessary foundation.
+3. **BVH** produces a major speedup and is the first hierarchical acceleration structure in the project to show strong performance gains.
+
+These results support the next planned step of the project:
+- keep **BVH** as the current strongest acceleration baseline,
+- continue investigating more advanced structures,
+- and later compare them with **kd-trees** or other spatial partitioning methods.
