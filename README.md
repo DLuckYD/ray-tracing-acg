@@ -1,7 +1,6 @@
 # Ray Tracing in Python
 
-<!-- PLACEHOLDER: Insert render image here -->
-<!-- Example: ![Render](path/to/render.png) -->
+<img width="2000" height="1500" alt="bvh" src="https://github.com/user-attachments/assets/e8c8daaa-495a-4105-890f-24cbffeedc99" />
 
 ## Overview
 
