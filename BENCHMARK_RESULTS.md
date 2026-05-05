@@ -17,7 +17,7 @@ Features:
 - designed to test object-level bounding box rejection
 - resolution: **500 x 500**
 - number of runs: **10**
-<img width="1200" height="1200" alt="aabb_test" src="https://github.com/user-attachments/assets/bc73077a-336e-4c03-94b4-9e65c068d659" />
+<img width="500" height="500" alt="render" src="https://github.com/user-attachments/assets/05601796-70c3-48e9-bc1d-cdf83b3f2e40" />
 
 ## Tested Optimization
 
@@ -81,7 +81,7 @@ Features:
 - resolution: **200 x 300**
 - number of runs: **10**
 
-<img width="25%" height="38%" alt="render" src="https://github.com/user-attachments/assets/6b225b2e-144f-47b0-997b-c8b963b0113f" />
+<img width="200" height="300" alt="render" src="https://github.com/user-attachments/assets/6b225b2e-144f-47b0-997b-c8b963b0113f" />
 
 ## Tested Methods
 
