@@ -17,7 +17,8 @@ Features:
 - designed to test object-level bounding box rejection
 - resolution: **500 x 500**
 - number of runs: **10**
-![aabb_test.png](aabb_test.png)
+<img width="1200" height="1200" alt="aabb_test" src="https://github.com/user-attachments/assets/bc73077a-336e-4c03-94b4-9e65c068d659" />
+
 ## Tested Optimization
 
 An **AABB-based acceleration step** was added to the ray-object search.
@@ -77,10 +78,11 @@ Features:
 - floor plane
 - more realistic spatial distribution of objects
 - recursive ray tracing enabled
-- resolution: **300 x 300**
+- resolution: **200 x 300**
 - number of runs: **10**
 
-![bvh.png](bvh.png)
+<img width="25%" height="38%" alt="render" src="https://github.com/user-attachments/assets/6b225b2e-144f-47b0-997b-c8b963b0113f" />
+
 ## Tested Methods
 
 Three intersection search strategies were compared:
