@@ -1,5 +1,8 @@
 import math
 import time
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from math import remainder
 
 from PIL import Image
 
@@ -7,8 +10,8 @@ from PIL import Image
 def main():
     print("Hello")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
 
 class Vec3:
@@ -724,6 +727,196 @@ def split_bvh_objects(objects):
 
     return bvh_objects, non_bvh
 
+def split_rows(height, num_workers):
+    chunks = []
+    rows_per_worker = height // num_workers
+    remainder = height % num_workers
+
+    y_start = 0
+
+    for i in range(num_workers):
+        extra = 1 if i < remainder else 0
+        y_end = y_start + rows_per_worker + extra
+        chunks.append((y_start, y_end))
+        y_start = y_end
+
+    return chunks
+
+def split_rows_fixed_chunk_size(height, chunk_height):
+    chunks = []
+    y_start = 0
+
+    while y_start < height:
+        y_end = min(y_start + chunk_height, height)
+        chunks.append((y_start, y_end))
+        y_start = y_end
+
+    return chunks
+
+def render_chunk(args):
+    global use_aabb
+    global use_bvh
+    global bvh_root
+    global non_bvh_objects
+    global blocker_cache_object
+
+    (
+        y_start,
+        y_end,
+        width,
+        height,
+        objects,
+        background_color,
+        light_position,
+        depth,
+        max_depth,
+        chunk_use_aabb,
+        chunk_use_bvh,
+        chunk_bvh_root,
+        chunk_non_bvh_objects
+    ) = args
+
+    use_aabb = chunk_use_aabb
+    use_bvh = chunk_use_bvh
+    bvh_root = chunk_bvh_root
+    non_bvh_objects = chunk_non_bvh_objects
+    blocker_cache_object = None
+
+    camera_origin = Vec3(0, 0, 0)
+    image_plane_z = -1
+    aspect_ratio = width / height
+    viewport_height = 2.0
+    viewport_width = viewport_height * aspect_ratio
+
+    rows_data = []
+
+    for y in range(y_start, y_end):
+        row_pixels = []
+
+        for x in range(width):
+            u = (x + 0.5) / width
+            v = (y + 0.5) / height
+
+            screen_x = (u - 0.5) * viewport_width
+            screen_y = (0.5 - v) * viewport_height
+
+            pixel_pos = Vec3(screen_x, screen_y, image_plane_z)
+            direction = (pixel_pos - camera_origin).normalize()
+
+            ray = Ray(camera_origin, direction)
+            color = trace_ray(
+                ray,
+                objects,
+                background_color,
+                light_position,
+                depth,
+                max_depth
+            )
+
+            r = int(max(0, min(255, color.x * 255)))
+            g = int(max(0, min(255, color.y * 255)))
+            b = int(max(0, min(255, color.z * 255)))
+
+            row_pixels.append((r, g, b))
+
+        rows_data.append((y, row_pixels))
+
+    return rows_data
+
+def render_parallel(width, height, objects, background_color, light_position, depth, max_depth, num_workers):
+    image = Image.new("RGB", (width, height))
+
+    # chunks = split_rows(height, num_workers)
+    chunks = split_rows_fixed_chunk_size(height, 5)
+
+    task_args = []
+    for y_start, y_end in chunks:
+        task_args.append((
+            y_start,
+            y_end,
+            width,
+            height,
+            objects,
+            background_color,
+            light_position,
+            depth,
+            max_depth,
+            use_aabb,
+            use_bvh,
+            bvh_root,
+            non_bvh_objects
+        ))
+
+    print(f"Using {num_workers} worker processes")
+    print(f"Image divided into {len(chunks)} chunks")
+
+    completed_chunks = 0
+
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(render_chunk, args) for args in task_args]
+
+        for future in as_completed(futures):
+            rows_data = future.result()
+
+            for y, row_pixels in rows_data:
+                if y < 0 or y >= height:
+                    print(f"BAD Y INDEX: y={y}, height={height}")
+                    continue
+
+                if len(row_pixels) != width:
+                    print(f"BAD ROW LENGTH: len(row_pixels)={len(row_pixels)}, width={width}")
+
+                for x, pixel in enumerate(row_pixels):
+                    if x < 0 or x >= width:
+                        print(f"BAD X INDEX: x={x}, width={width}, y={y}")
+                        continue
+
+                    image.putpixel((x, y), pixel)
+
+            completed_chunks += 1
+            print(f"\rCompleted chunks: {completed_chunks} / {len(chunks)}", end="", flush=True)
+
+    print()
+    image.save("render.png")
+    print("Parallel render finished: render.png")
+
+    return image
+
+def benchmark_render_parallel(runs, width, height, objects, background_color, light_position, depth, max_depth, num_workers):
+    times = []
+
+    for i in range(runs):
+        print(f"\nStarting parallel run {i + 1} / {runs}")
+
+        start_time = time.perf_counter()
+        render_parallel(
+            width,
+            height,
+            objects,
+            background_color,
+            light_position,
+            depth,
+            max_depth,
+            num_workers
+        )
+        end_time = time.perf_counter()
+
+        elapsed = end_time - start_time
+        times.append(elapsed)
+
+        print(f"Parallel run {i + 1} time: {elapsed:.3f} seconds")
+
+    average_time = sum(times) / len(times)
+
+    print("\nParallel benchmark finished.")
+    print("All runs:")
+    for i, t in enumerate(times, start=1):
+        print(f"  Run {i}: {t:.3f} seconds")
+
+    print(f"\nAverage parallel render time over {runs} runs: {average_time:.3f} seconds")
+
+    return times, average_time
+
 
 def build_realistic_benchmark_scene():
     # Main light source
@@ -1114,42 +1307,191 @@ def build_realistic_benchmark_scene():
     )
 
     return objects, background_color, light_position
+def build_aabb_benchmark_scene():
+    # Strong directional light
+    light_position = Vec3(-10, 9, 4)
 
+    # Dark blue background
+    background_color = Vec3(0.04, 0.06, 0.10)
+
+    objects = []
+
+    # =========================================================
+    # Large foreground spheres
+    # These create coherent primary hits in the center.
+    # =========================================================
+    objects.append(
+        Sphere(Vec3(-2.4, 0.2, -7.5), 1.5, Vec3(1.0, 0.2, 0.2), 0.0, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(0.0, 0.0, -8.0), 1.7, Vec3(0.2, 1.0, 0.25), 0.0, 0.0, 1.0)
+    )
+    objects.append(
+        Sphere(Vec3(2.6, 0.15, -7.6), 1.45, Vec3(0.2, 0.45, 1.0), 0.0, 0.0, 1.0)
+    )
+
+    # =========================================================
+    # Triangle wall in the far background
+    # AABB should help here, because many rays will reject many triangles.
+    # =========================================================
+    triangle_colors = [
+        Vec3(1.0, 0.85, 0.15),
+        Vec3(1.0, 0.45, 0.20),
+        Vec3(0.2, 1.0, 0.9),
+        Vec3(0.9, 0.2, 1.0),
+        Vec3(0.3, 0.9, 0.25),
+        Vec3(0.2, 0.55, 1.0),
+    ]
+
+    # Grid of triangles in depth
+    idx = 0
+    for row in range(6):
+        for col in range(10):
+            base_x = -10.0 + col * 2.0
+            base_y = 3.5 - row * 1.2
+            base_z = -14.0 - row * 0.6
+
+            color = triangle_colors[idx % len(triangle_colors)]
+            idx += 1
+
+            # Upright triangle
+            objects.append(
+                Triangle(
+                    Vec3(base_x - 0.7, base_y - 0.6, base_z),
+                    Vec3(base_x + 0.7, base_y - 0.5, base_z - 0.1),
+                    Vec3(base_x,       base_y + 0.9, base_z + 0.1),
+                    color,
+                    reflection=0.0,
+                    transparency=0.0,
+                    ior=1.0
+                )
+            )
+
+    # =========================================================
+    # Side triangle groups
+    # These are intentionally placed far on the left/right,
+    # so many central rays should reject them via AABB.
+    # =========================================================
+    for i in range(12):
+        z = -9.0 - i * 0.8
+
+        # Left side
+        objects.append(
+            Triangle(
+                Vec3(-11.5, -1.4, z),
+                Vec3(-9.8,  0.2, z - 0.2),
+                Vec3(-10.6, 1.8, z + 0.1),
+                Vec3(1.0, 0.8, 0.15),
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+        # Right side
+        objects.append(
+            Triangle(
+                Vec3(11.5, -1.3, z),
+                Vec3(9.7,   0.1, z - 0.2),
+                Vec3(10.5,  1.7, z + 0.2),
+                Vec3(0.2, 0.85, 1.0),
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+    # =========================================================
+    # Small triangle band near the lower background
+    # This increases the object count significantly.
+    # =========================================================
+    for i in range(20):
+        x = -9.5 + i * 1.0
+        z = -11.0 - (i % 4) * 0.5
+        color = triangle_colors[i % len(triangle_colors)]
+
+        objects.append(
+            Triangle(
+                Vec3(x - 0.35, -1.8, z),
+                Vec3(x + 0.35, -1.8, z),
+                Vec3(x,        -0.9, z + 0.1),
+                color,
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+    return objects, background_color, light_position
 # Global feature flags
 use_aabb = True
 blocker_cache_object = None
 use_bvh = True
 bvh_root = None
+#
+#
+#
+# objects, background_color, light_position = build_aabb_benchmark_scene()
+#
+# bvh_objects, non_bvh_objects = split_bvh_objects(objects)
+#
+# if use_bvh:
+#     bvh_root = build_bvh(bvh_objects)
+# else:
+#     bvh_root = None
+#
+#
+#
+# times, average_time = benchmark_render(
+#     runs=1,
+#     width=500,
+#     height=500,
+#     objects=objects,
+#     background_color=background_color,
+#     light_position=light_position,
+#     depth=0,
+#     max_depth=4
+# )
 
 
 
-objects, background_color, light_position = build_realistic_benchmark_scene()
 
-bvh_objects, non_bvh_objects = split_bvh_objects(objects)
 
-if use_bvh:
-    bvh_root = build_bvh(bvh_objects)
-else:
+# im = Image.open("render.png")
+# im.show("Render")
+
+if __name__ == "__main__":
+    print("Hello")
+
+    available_cpus = os.cpu_count()
+    print(f"Available logical CPU threads: {available_cpus}")
+
+    num_workers = 14
+
+    objects, background_color, light_position = build_realistic_benchmark_scene()
+
+    use_aabb = True
+    blocker_cache_object = None
+    use_bvh = True
     bvh_root = None
 
+    bvh_objects, non_bvh_objects = split_bvh_objects(objects)
+    if use_bvh:
+        bvh_root = build_bvh(bvh_objects)
+    else:
+        bvh_root = None
 
+    times, average_time = benchmark_render_parallel(
+        runs=3,
+        width=2000,
+        height=1500,
+        objects=objects,
+        background_color=background_color,
+        light_position=light_position,
+        depth=0,
+        max_depth=2,
+        num_workers=num_workers
+    )
 
-times, average_time = benchmark_render(
-    runs=1,
-    width=200,
-    height=300,
-    objects=objects,
-    background_color=background_color,
-    light_position=light_position,
-    depth=0,
-    max_depth=4
-)
-
-
-
-
-
-im = Image.open("render.png")
-im.show("Render")
-
-
+    im = Image.open("render.png")
+    im.show("Render")
