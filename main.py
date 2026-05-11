@@ -74,6 +74,8 @@ class Sphere:
         self.reflection = reflection
         self.transparency = transparency
         self.ior = ior #index of refraction
+        radius_vec = Vec3(self.radius, self.radius, self.radius)
+        self.aabb = AABB(self.center - radius_vec, self.center + radius_vec)
 
     def intersect(self, ray):
 
@@ -100,6 +102,11 @@ class Sphere:
         else:
             return None
 
+    def get_aabb(self):
+        return self.aabb
+
+
+
     def normal_at(self, hit_point):
         return Vec3((hit_point.x - self.center.x)/self.radius ,(hit_point.y - self.center.y)/self.radius ,(hit_point.z - self.center.z)/self.radius)
 
@@ -121,8 +128,12 @@ class Plane :
         if t <= 0:
             return None
         return t
+
     def normal_at(self, hit_point):
         return self.normal
+
+    def get_aabb(self):
+        return None
 
 class Triangle:
 
@@ -132,8 +143,9 @@ class Triangle:
         self.v2 = v2
         self.color = color
         self.reflection = reflection
-        self.transparency = transparency
+        self. transparency = transparency
         self.ior = ior  # index of refraction
+        self.aabb = self.create_aabb()
 
     def normal_at(self, hit_point):
         edge1 = self.v1 - self.v0
@@ -172,12 +184,80 @@ class Triangle:
 
         return None
 
+    def create_aabb(self):
+        epsilon = 0.000001
+        min_x = min(self.v0.x, self.v1.x, self.v2.x) - epsilon
+        min_y = min(self.v0.y, self.v1.y, self.v2.y) - epsilon
+        min_z = min(self.v0.z, self.v1.z, self.v2.z) - epsilon
+
+        max_x = max(self.v0.x, self.v1.x, self.v2.x) + epsilon
+        max_y = max(self.v0.y, self.v1.y, self.v2.y) + epsilon
+        max_z = max(self.v0.z, self.v1.z, self.v2.z) + epsilon
+
+        min_point = Vec3(min_x, min_y, min_z)
+        max_point = Vec3(max_x, max_y, max_z)
+
+        return AABB(min_point, max_point)
+
+    def get_aabb(self):
+        return self.aabb
+
 
 def find_closest_hit(ray, objects):
+    global use_aabb
+    global use_bvh
+    global bvh_root
+    global non_bvh_objects
+
+    # =====================================================
+    # BVH mode
+    # =====================================================
+    if use_bvh:
+        bvh_hit_object, bvh_hit_t = bvh_intersect(ray, bvh_root)
+
+        extra_hit_object = None
+        extra_hit_t = None
+
+        # Test objects that are not inside BVH, for example Plane
+        for obj in non_bvh_objects:
+            t = obj.intersect(ray)
+            if t is None:
+                continue
+
+            if extra_hit_t is None:
+                extra_hit_t = t
+                extra_hit_object = obj
+            elif t < extra_hit_t:
+                extra_hit_t = t
+                extra_hit_object = obj
+
+        # Compare BVH result and non-BVH result
+        if bvh_hit_t is not None and extra_hit_t is None:
+            return bvh_hit_object, bvh_hit_t
+
+        if extra_hit_t is not None and bvh_hit_t is None:
+            return extra_hit_object, extra_hit_t
+
+        if bvh_hit_t is not None and extra_hit_t is not None:
+            if bvh_hit_t < extra_hit_t:
+                return bvh_hit_object, bvh_hit_t
+            else:
+                return extra_hit_object, extra_hit_t
+
+        return None, None
+
+    # =====================================================
+    # Brute force / AABB mode
+    # =====================================================
     closest_t = None
     closest_object = None
 
     for obj in objects:
+        if use_aabb:
+            aabb = obj.get_aabb()
+            if aabb is not None and not aabb.intersect(ray):
+                continue
+
         t = obj.intersect(ray)
         if t is None:
             continue
@@ -190,7 +270,6 @@ def find_closest_hit(ray, objects):
             closest_object = obj
 
     return closest_object, closest_t
-
 
 def trace_ray(ray, objects, background_color, light_position , depth, max_depth):
     if depth > max_depth:
@@ -332,267 +411,7 @@ def refract(direction, normal, n1, n2):
         refracted_ray = direction_norm * eta + normal_norm * (eta * cos_i - math.sqrt(k))
         return refracted_ray.normalize()
 
-def build_final_scene():
-    # Main light source
-    light_position = Vec3(-14, 12, 6)
 
-    # Background color
-    background_color = Vec3(0.05, 0.08, 0.14)
-
-    # Scene object container
-    objects = []
-
-    # =========================================================
-    # Main hero objects
-    # =========================================================
-
-    # Main central glass sphere
-    objects.append(
-        Sphere(Vec3(0.0, 0.8, -6.0), 1.5, Vec3(0.92, 0.95, 1.0), 0.08, 0.82, 1.5)
-    )
-
-    # Two reflective metallic spheres near the camera
-    objects.append(
-        Sphere(Vec3(-1.8, -0.4, -4.8), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
-    )
-    objects.append(
-        Sphere(Vec3(1.8, -0.35, -5.0), 0.7, Vec3(0.9, 0.9, 0.95), 0.75, 0.0, 1.0)
-    )
-
-    # =========================================================
-    # Large colored spheres around the center
-    # =========================================================
-
-    objects.append(
-        Sphere(Vec3(-3.8, 0.7, -8.0), 1.15, Vec3(1.0, 0.15, 0.15), 0.18, 0.0, 1.0)
-    )
-    objects.append(
-        Sphere(Vec3(3.9, 0.6, -8.2), 1.15, Vec3(0.15, 1.0, 0.2), 0.18, 0.0, 1.0)
-    )
-    objects.append(
-        Sphere(Vec3(0.0, -0.1, -9.5), 1.25, Vec3(0.2, 0.45, 1.0), 0.22, 0.0, 1.0)
-    )
-
-    # =========================================================
-    # Medium ring of spheres
-    # =========================================================
-
-    ring_data = [
-        (-5.8, 1.2, -10.0, 0.75, Vec3(1.0, 0.95, 0.1), 0.12),
-        (-4.5, -0.2, -9.2, 0.65, Vec3(1.0, 0.55, 0.05), 0.10),
-        (-2.8, -1.0, -8.4, 0.60, Vec3(0.05, 0.95, 0.95), 0.10),
-        (-0.8, -1.25, -8.0, 0.55, Vec3(0.85, 0.2, 1.0), 0.12),
-        (1.2, -1.2, -8.0, 0.55, Vec3(1.0, 0.4, 0.8), 0.12),
-        (3.0, -0.95, -8.5, 0.60, Vec3(0.0, 0.75, 1.0), 0.10),
-        (4.8, -0.15, -9.3, 0.65, Vec3(0.65, 1.0, 0.1), 0.10),
-        (6.2, 1.15, -10.2, 0.75, Vec3(1.0, 0.1, 0.95), 0.12),
-    ]
-
-    for x, y, z, r, color, refl in ring_data:
-        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
-
-    # =========================================================
-    # Small scattered spheres in the lower middle depth
-    # =========================================================
-
-    extra_colors = [
-        Vec3(1.0, 0.2, 0.2),
-        Vec3(0.2, 1.0, 0.2),
-        Vec3(0.2, 0.5, 1.0),
-        Vec3(1.0, 0.9, 0.2),
-        Vec3(1.0, 0.2, 0.9),
-        Vec3(0.2, 1.0, 1.0),
-    ]
-
-    scatter_positions = [
-        (-6.5, -1.25, -8.0), (-5.8, -1.15, -8.8), (-5.0, -1.05, -9.6),
-        (-4.2, -1.2, -10.4), (-3.4, -1.1, -11.2), (-2.6, -1.0, -12.0),
-        (2.6, -1.0, -12.0), (3.4, -1.1, -11.2), (4.2, -1.2, -10.4),
-        (5.0, -1.05, -9.6), (5.8, -1.15, -8.8), (6.5, -1.25, -8.0),
-    ]
-
-    for i, (x, y, z) in enumerate(scatter_positions):
-        color = extra_colors[i % len(extra_colors)]
-        objects.append(
-            Sphere(Vec3(x, y, z), 0.22, color, 0.08, 0.0, 1.0)
-        )
-
-    # =========================================================
-    # Front row of small spheres
-    # =========================================================
-
-    front_data = [
-        (-4.5, -1.15, -6.6, 0.45, Vec3(1.0, 0.9, 0.2), 0.10),
-        (-3.2, -1.25, -6.2, 0.42, Vec3(0.2, 1.0, 1.0), 0.10),
-        (-1.9, -1.3, -6.0, 0.40, Vec3(1.0, 0.3, 0.3), 0.10),
-        (-0.6, -1.32, -5.9, 0.38, Vec3(0.3, 0.8, 1.0), 0.10),
-        (0.7, -1.3, -6.0, 0.40, Vec3(0.6, 1.0, 0.2), 0.10),
-        (2.0, -1.26, -6.2, 0.42, Vec3(1.0, 0.5, 0.1), 0.10),
-        (3.3, -1.18, -6.6, 0.45, Vec3(1.0, 0.2, 0.8), 0.10),
-    ]
-
-    for x, y, z, r, color, refl in front_data:
-        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
-
-    # =========================================================
-    # Additional transparent accent spheres
-    # =========================================================
-
-    objects.append(
-        Sphere(Vec3(-2.2, 0.15, -5.9), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
-    )
-    objects.append(
-        Sphere(Vec3(2.4, 0.1, -6.1), 0.55, Vec3(0.85, 0.95, 1.0), 0.05, 0.75, 1.45)
-    )
-
-    # =========================================================
-    # Back row of spheres for depth and reflections
-    # =========================================================
-
-    back_data = [
-        (-7.5, 1.4, -12.0, 0.85, Vec3(0.9, 0.2, 0.2), 0.14),
-        (-5.2, 1.9, -12.8, 0.90, Vec3(0.2, 0.9, 0.3), 0.14),
-        (-2.8, 2.2, -13.2, 0.95, Vec3(0.2, 0.5, 1.0), 0.16),
-        (0.0, 2.35, -13.6, 1.00, Vec3(0.95, 0.9, 0.2), 0.16),
-        (2.8, 2.2, -13.2, 0.95, Vec3(1.0, 0.25, 0.9), 0.16),
-        (5.2, 1.9, -12.8, 0.90, Vec3(0.3, 1.0, 1.0), 0.14),
-        (7.5, 1.4, -12.0, 0.85, Vec3(1.0, 0.55, 0.15), 0.14),
-    ]
-
-    for x, y, z, r, color, refl in back_data:
-        objects.append(Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0))
-
-    # =========================================================
-    # Triangles: large background accents
-    # =========================================================
-
-    # Large warm triangle behind the left side
-    objects.append(
-        Triangle(
-            Vec3(-6.8, -1.2, -11.5),
-            Vec3(-3.2, 2.8, -11.8),
-            Vec3(-1.8, -1.4, -10.8),
-            Vec3(1.0, 0.55, 0.15),
-            reflection=0.08,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # Large cool triangle behind the right side
-    objects.append(
-        Triangle(
-            Vec3(2.2, -1.3, -11.0),
-            Vec3(4.8, 2.7, -12.0),
-            Vec3(7.2, -1.1, -11.6),
-            Vec3(0.15, 0.7, 1.0),
-            reflection=0.08,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # Central decorative triangle in the far background
-    objects.append(
-        Triangle(
-            Vec3(-1.2, 0.0, -13.8),
-            Vec3(1.4, 0.2, -13.6),
-            Vec3(0.1, 3.2, -14.2),
-            Vec3(0.95, 0.3, 0.85),
-            reflection=0.10,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # =========================================================
-    # Small foreground triangle accents
-    # =========================================================
-
-    # Left foreground triangle
-    objects.append(
-        Triangle(
-            Vec3(-3.4, -1.45, -5.4),
-            Vec3(-2.6, -0.55, -5.6),
-            Vec3(-1.9, -1.45, -5.8),
-            Vec3(1.0, 0.95, 0.2),
-            reflection=0.12,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # Right foreground triangle
-    objects.append(
-        Triangle(
-            Vec3(2.0, -1.45, -5.6),
-            Vec3(2.8, -0.45, -5.7),
-            Vec3(3.7, -1.45, -5.5),
-            Vec3(0.2, 1.0, 0.95),
-            reflection=0.12,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # Small central triangle below the glass sphere
-    objects.append(
-        Triangle(
-            Vec3(-0.7, -1.35, -5.1),
-            Vec3(0.0, -0.35, -5.2),
-            Vec3(0.8, -1.35, -5.0),
-            Vec3(1.0, 0.35, 0.25),
-            reflection=0.15,
-            transparency=0.0,
-            ior=1.0
-        )
-    )
-
-    # =========================================================
-    # Floor plane
-    # =========================================================
-
-    objects.append(
-        Plane(Vec3(0, -1.7, 0), Vec3(0, 1, 0), Vec3(0.78, 0.78, 0.82), 0.22)
-    )
-
-    return objects, background_color, light_position
-
-    return objects, background_color, light_position
-def build_cache_benchmark_scene():
-    light_position = Vec3(-8, 8, 4)
-    background_color = Vec3(0.05, 0.07, 0.1)
-
-    objects = []
-
-    # Large foreground spheres to maximize ray coherence
-    objects.append(Sphere(Vec3(-2.8, 0.0, -7.0), 2.2, Vec3(1.0, 0.2, 0.2), 0.0, 0.0, 1.0))
-    objects.append(Sphere(Vec3(0.0, 0.0, -7.5), 2.4, Vec3(0.2, 1.0, 0.2), 0.0, 0.0, 1.0))
-    objects.append(Sphere(Vec3(2.8, 0.0, -7.0), 2.2, Vec3(0.2, 0.4, 1.0), 0.0, 0.0, 1.0))
-
-    # Many small background spheres to make full search expensive
-    small_colors = [
-        Vec3(1.0, 0.9, 0.2),
-        Vec3(1.0, 0.4, 0.2),
-        Vec3(0.2, 1.0, 1.0),
-        Vec3(1.0, 0.2, 0.9),
-        Vec3(0.8, 1.0, 0.2),
-        Vec3(0.4, 0.8, 1.0),
-    ]
-
-    positions = []
-    for row in range(5):
-        for col in range(10):
-            x = -9 + col * 2.0
-            y = 3.5 - row * 1.4
-            z = -14 - row * 0.8
-            positions.append((x, y, z))
-
-    for i, (x, y, z) in enumerate(positions):
-        color = small_colors[i % len(small_colors)]
-        objects.append(Sphere(Vec3(x, y, z), 0.45, color, 0.0, 0.0, 1.0))
-
-    return objects, background_color, light_position
 def benchmark_render(runs, width, height, objects, background_color, light_position, depth, max_depth):
     times = []
 
@@ -648,30 +467,687 @@ def is_shadow_blocked(shadow_ray, objects, distance_to_light):
     # 3. Nothing blocks the light
     return False
 
-objects, background_color, light_position = build_final_scene()
+class AABB:
+    def __init__(self, min_point, max_point):
+        self.min_point = min_point
+        self.max_point = max_point
 
-triangle1 = Triangle(
-    Vec3(-1.5, -1.0, -6.0),
-    Vec3(1.5, -1.0, -6.0),
-    Vec3(0.0, 5, -6.0),
-    Vec3(1.0, 0.3, 0.3),
-    reflection=0.0,
-    transparency=0.70,
-    ior=1.0
-)
+    def intersect(self, ray):
+        # Small epsilon to avoid division issues when direction is very close to zero
+        epsilon = 0.000001
 
-objects.append(triangle1)
+        # ---------------------------------------------------------
+        # X slab
+        # ---------------------------------------------------------
+        # If the ray is almost parallel to the X planes,
+        # then it can hit the box only if its origin.x is already inside the slab.
+        if abs(ray.direction.x) < epsilon:
+            if ray.origin.x < self.min_point.x or ray.origin.x > self.max_point.x:
+                return False
+            tx_min = -float("inf")
+            tx_max = float("inf")
+        else:
+            tx1 = (self.min_point.x - ray.origin.x) / ray.direction.x
+            tx2 = (self.max_point.x - ray.origin.x) / ray.direction.x
+
+            # tx_min is the entry distance for X, tx_max is the exit distance
+            tx_min = min(tx1, tx2)
+            tx_max = max(tx1, tx2)
+
+        # ---------------------------------------------------------
+        # Y slab
+        # ---------------------------------------------------------
+        if abs(ray.direction.y) < epsilon:
+            if ray.origin.y < self.min_point.y or ray.origin.y > self.max_point.y:
+                return False
+            ty_min = -float("inf")
+            ty_max = float("inf")
+        else:
+            ty1 = (self.min_point.y - ray.origin.y) / ray.direction.y
+            ty2 = (self.max_point.y - ray.origin.y) / ray.direction.y
+
+            ty_min = min(ty1, ty2)
+            ty_max = max(ty1, ty2)
+
+        # ---------------------------------------------------------
+        # Z slab
+        # ---------------------------------------------------------
+        if abs(ray.direction.z) < epsilon:
+            if ray.origin.z < self.min_point.z or ray.origin.z > self.max_point.z:
+                return False
+            tz_min = -float("inf")
+            tz_max = float("inf")
+        else:
+            tz1 = (self.min_point.z - ray.origin.z) / ray.direction.z
+            tz2 = (self.max_point.z - ray.origin.z) / ray.direction.z
+
+            tz_min = min(tz1, tz2)
+            tz_max = max(tz1, tz2)
+
+        # ---------------------------------------------------------
+        # Combine intervals from X, Y, Z
+        # ---------------------------------------------------------
+        # The ray must be inside all three slab intervals at the same time.
+        t_enter = max(tx_min, ty_min, tz_min)
+        t_exit = min(tx_max, ty_max, tz_max)
+
+        # If entry is after exit, intervals do not overlap -> no hit
+        if t_enter > t_exit:
+            return False
+
+        # If the whole box is behind the ray origin, we also reject it
+        if t_exit < 0:
+            return False
+
+        return True
+
+
+
+def merge_aabb(aabb1, aabb2):
+    min_x = min(aabb1.min_point.x, aabb2.min_point.x)
+    min_y = min(aabb1.min_point.y, aabb2.min_point.y)
+    min_z = min(aabb1.min_point.z, aabb2.min_point.z)
+
+    max_x = max(aabb1.max_point.x, aabb2.max_point.x)
+    max_y = max(aabb1.max_point.y, aabb2.max_point.y)
+    max_z = max(aabb1.max_point.z, aabb2.max_point.z)
+
+    min_point = Vec3(min_x, min_y, min_z)
+    max_point = Vec3(max_x, max_y, max_z)
+
+    return AABB(min_point, max_point)
+
+def compute_objects_aabb(objects):
+    scene_aabb = None
+
+    for obj in objects:
+        obj_aabb = obj.get_aabb()
+
+        # Skip objects without finite AABB, for example Plane
+        if obj_aabb is None:
+            continue
+
+        if scene_aabb is None:
+            scene_aabb = obj_aabb
+        else:
+            scene_aabb = merge_aabb(scene_aabb, obj_aabb)
+
+    return scene_aabb
+
+class BVHNode():
+    def __init__(self, aabb, left=None, right=None, objects=None, is_leaf=False):
+        self.aabb = aabb
+        self.left = left
+        self.right = right
+        self.objects = objects
+        self.is_leaf = is_leaf
+
+def build_bvh(objects):
+    # Remove objects without finite AABB
+    valid_objects = []
+    for obj in objects:
+        if obj.get_aabb() is not None:
+            valid_objects.append(obj)
+
+    # Safety check
+    if len(valid_objects) == 0:
+        return None
+
+    # Compute bounding box for the whole node
+    node_aabb = compute_objects_aabb(valid_objects)
+
+    # Leaf criterion
+    if len(valid_objects) <= 2:
+        return BVHNode(
+            aabb=node_aabb,
+            left=None,
+            right=None,
+            objects=valid_objects,
+            is_leaf=True
+        )
+
+    # Choose split axis based on node AABB extent
+    axis = get_largest_axis(node_aabb)
+
+    # Sort objects by AABB center along the chosen axis
+    if axis == 0:
+        valid_objects.sort(key=lambda obj: get_aabb_center(obj).x)
+    elif axis == 1:
+        valid_objects.sort(key=lambda obj: get_aabb_center(obj).y)
+    else:
+        valid_objects.sort(key=lambda obj: get_aabb_center(obj).z)
+
+    # Split in the middle
+    mid = len(valid_objects) // 2
+    left_objects = valid_objects[:mid]
+    right_objects = valid_objects[mid:]
+
+    # Build children recursively
+    left_node = build_bvh(left_objects)
+    right_node = build_bvh(right_objects)
+
+    # Create inner node
+    return BVHNode(
+        aabb=node_aabb,
+        left=left_node,
+        right=right_node,
+        objects=None,
+        is_leaf=False
+    )
+
+def get_aabb_center(obj):
+    aabb = obj.get_aabb()
+
+    center_x = (aabb.min_point.x + aabb.max_point.x) * 0.5
+    center_y = (aabb.min_point.y + aabb.max_point.y) * 0.5
+    center_z = (aabb.min_point.z + aabb.max_point.z) * 0.5
+
+    return Vec3(center_x, center_y, center_z)
+
+def get_largest_axis(aabb):
+    size_x = aabb.max_point.x - aabb.min_point.x
+    size_y = aabb.max_point.y - aabb.min_point.y
+    size_z = aabb.max_point.z - aabb.min_point.z
+
+    if size_x >= size_y and size_x >= size_z:
+        return 0
+    elif size_y >= size_x and size_y >= size_z:
+        return 1
+    else:
+        return 2
+
+def bvh_intersect(ray, node):
+    # Safety check
+    if node is None:
+        return None, None
+
+    # If the ray does not hit the node bounding box,
+    # nothing inside this node can be hit
+    if not node.aabb.intersect(ray):
+        return None, None
+
+    # -------------------------------------------------
+    # Leaf node: test all objects stored in the leaf
+    # -------------------------------------------------
+    if node.is_leaf:
+        hit_object = None
+        hit_t = None
+
+        for obj in node.objects:
+            t = obj.intersect(ray)
+            if t is None:
+                continue
+
+            if hit_t is None:
+                hit_t = t
+                hit_object = obj
+            elif t < hit_t:
+                hit_t = t
+                hit_object = obj
+
+        return hit_object, hit_t
+
+    # -------------------------------------------------
+    # Inner node: recurse into both children
+    # -------------------------------------------------
+    left_object, left_t = bvh_intersect(ray, node.left)
+    right_object, right_t = bvh_intersect(ray, node.right)
+
+    # If only left child has a hit
+    if left_t is not None and right_t is None:
+        return left_object, left_t
+
+    # If only right child has a hit
+    if right_t is not None and left_t is None:
+        return right_object, right_t
+
+    # If both children have hits, choose the nearer one
+    if left_t is not None and right_t is not None:
+        if left_t < right_t:
+            return left_object, left_t
+        else:
+            return right_object, right_t
+
+    # No hit in either child
+    return None, None
+
+
+def split_bvh_objects(objects):
+    bvh_objects = []
+    non_bvh = []
+
+    for obj in objects:
+        if obj.get_aabb() is None:
+            non_bvh.append(obj)
+        else:
+            bvh_objects.append(obj)
+
+    return bvh_objects, non_bvh
+
+
+def build_realistic_benchmark_scene():
+    # Main light source
+    light_position = Vec3(-16, 14, 8)
+
+    # Dark bluish background
+    background_color = Vec3(0.3, 0.5, 0.3)
+
+    objects = []
+
+    # =========================================================
+    # Foreground / hero objects
+    # =========================================================
+
+    # Central glass sphere
+    objects.append(
+        Sphere(
+            Vec3(0.0, 0.8, -6.2),
+            1.45,
+            Vec3(0.92, 0.95, 1.0),
+            reflection=0.08,
+            transparency=0.82,
+            ior=1.5
+        )
+    )
+
+    # Reflective metal spheres in the front
+    objects.append(
+        Sphere(
+            Vec3(-2.5, -0.45, -4.8),
+            0.75,
+            Vec3(0.9, 0.9, 0.95),
+            reflection=0.78,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(2.6, -0.35, -5.0),
+            0.72,
+            Vec3(0.9, 0.9, 0.95),
+            reflection=0.78,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Elevated colored side spheres
+    objects.append(
+        Sphere(
+            Vec3(-4.8, 1.4, -8.6),
+            1.05,
+            Vec3(1.0, 0.18, 0.18),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(4.7, 1.2, -8.7),
+            1.05,
+            Vec3(0.18, 1.0, 0.24),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # Deep blue sphere behind the glass
+    objects.append(
+        Sphere(
+            Vec3(0.0, -0.1, -9.9),
+            1.3,
+            Vec3(0.2, 0.45, 1.0),
+            reflection=0.18,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
+    # Floating transparent accent spheres
+    # =========================================================
+
+    objects.append(
+        Sphere(
+            Vec3(-2.9, 1.8, -6.8),
+            0.48,
+            Vec3(0.85, 0.95, 1.0),
+            reflection=0.05,
+            transparency=0.75,
+            ior=1.45
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(2.9, 1.6, -6.9),
+            0.48,
+            Vec3(0.85, 0.95, 1.0),
+            reflection=0.05,
+            transparency=0.75,
+            ior=1.45
+        )
+    )
+
+    # Lower glass accents
+    objects.append(
+        Sphere(
+            Vec3(-2.3, -0.15, -6.3),
+            0.55,
+            Vec3(0.85, 0.95, 1.0),
+            reflection=0.05,
+            transparency=0.75,
+            ior=1.45
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(2.4, 0.05, -6.4),
+            0.55,
+            Vec3(0.85, 0.95, 1.0),
+            reflection=0.05,
+            transparency=0.75,
+            ior=1.45
+        )
+    )
+
+    # =========================================================
+    # Mid-depth spheres with more vertical variation
+    # =========================================================
+
+    ring_data = [
+        (-6.8, 2.0, -10.8, 0.70, Vec3(1.0, 0.95, 0.12), 0.10),
+        (-5.2, 0.5, -9.8, 0.62, Vec3(1.0, 0.55, 0.06), 0.10),
+        (-3.4, -1.0, -8.9, 0.58, Vec3(0.08, 0.95, 0.95), 0.10),
+        (-1.2, -1.55, -8.3, 0.56, Vec3(0.85, 0.2, 1.0), 0.12),
+        (1.2, -1.35, -8.4, 0.56, Vec3(1.0, 0.38, 0.82), 0.12),
+        (3.4, -0.7, -9.1, 0.60, Vec3(0.0, 0.75, 1.0), 0.10),
+        (5.2, 0.8, -10.0, 0.64, Vec3(0.65, 1.0, 0.15), 0.10),
+        (6.8, 2.1, -10.9, 0.72, Vec3(1.0, 0.12, 0.95), 0.12),
+    ]
+
+    for x, y, z, r, color, refl in ring_data:
+        objects.append(
+            Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0)
+        )
+
+    # =========================================================
+    # Front row of small spheres, now less flat
+    # =========================================================
+
+    front_data = [
+        (-5.2, -1.55, -6.9, 0.42, Vec3(1.0, 0.88, 0.18), 0.08),
+        (-3.8, -1.25, -6.3, 0.40, Vec3(0.2, 1.0, 1.0), 0.08),
+        (-2.3, -1.6, -6.0, 0.38, Vec3(1.0, 0.32, 0.32), 0.08),
+        (-0.8, -1.35, -5.85, 0.36, Vec3(0.3, 0.82, 1.0), 0.08),
+        (0.9, -1.5, -6.0, 0.38, Vec3(0.6, 1.0, 0.2), 0.08),
+        (2.5, -1.2, -6.25, 0.40, Vec3(1.0, 0.52, 0.12), 0.08),
+        (4.2, -1.45, -6.9, 0.43, Vec3(1.0, 0.22, 0.82), 0.08),
+    ]
+
+    for x, y, z, r, color, refl in front_data:
+        objects.append(
+            Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0)
+        )
+
+    # =========================================================
+    # Elevated background spheres
+    # =========================================================
+
+    back_data = [
+        (-8.5, 2.8, -12.8, 0.82, Vec3(0.9, 0.2, 0.2), 0.12),
+        (-6.0, 3.6, -13.6, 0.88, Vec3(0.2, 0.9, 0.3), 0.12),
+        (-3.2, 4.1, -14.2, 0.93, Vec3(0.2, 0.5, 1.0), 0.14),
+        (0.0, 4.4, -14.8, 1.00, Vec3(0.95, 0.9, 0.22), 0.14),
+        (3.2, 4.0, -14.1, 0.93, Vec3(1.0, 0.25, 0.9), 0.14),
+        (6.0, 3.5, -13.6, 0.88, Vec3(0.3, 1.0, 1.0), 0.12),
+        (8.5, 2.7, -12.8, 0.82, Vec3(1.0, 0.55, 0.15), 0.12),
+    ]
+
+    for x, y, z, r, color, refl in back_data:
+        objects.append(
+            Sphere(Vec3(x, y, z), r, color, refl, 0.0, 1.0)
+        )
+
+    # =========================================================
+    # Large background triangles with more vertical shape
+    # =========================================================
+
+    objects.append(
+        Triangle(
+            Vec3(-8.2, -1.6, -12.4),
+            Vec3(-4.1, 4.3, -12.5),
+            Vec3(-1.9, -0.8, -11.4),
+            Vec3(1.0, 0.55, 0.15),
+            reflection=0.05,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    objects.append(
+        Triangle(
+            Vec3(1.8, -1.3, -11.8),
+            Vec3(5.4, 4.0, -12.8),
+            Vec3(8.3, -0.9, -12.1),
+            Vec3(0.15, 0.7, 1.0),
+            reflection=0.05,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    objects.append(
+        Triangle(
+            Vec3(-1.8, 0.4, -14.8),
+            Vec3(1.8, 0.5, -14.2),
+            Vec3(0.1, 5.2, -15.2),
+            Vec3(0.95, 0.28, 0.85),
+            reflection=0.08,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
+    # Foreground triangle accents
+    # =========================================================
+
+    objects.append(
+        Triangle(
+            Vec3(-4.0, -1.75, -5.8),
+            Vec3(-2.9, -0.25, -5.9),
+            Vec3(-1.8, -1.65, -6.1),
+            Vec3(1.0, 0.95, 0.2),
+            reflection=0.10,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    objects.append(
+        Triangle(
+            Vec3(1.8, -1.75, -5.9),
+            Vec3(2.9, -0.2, -6.0),
+            Vec3(4.1, -1.7, -5.8),
+            Vec3(0.2, 1.0, 0.95),
+            reflection=0.10,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    objects.append(
+        Triangle(
+            Vec3(-0.9, -1.6, -5.2),
+            Vec3(0.0, 0.1, -5.3),
+            Vec3(1.0, -1.55, -5.1),
+            Vec3(1.0, 0.35, 0.25),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
+    # Side triangle fields with more height variation
+    # =========================================================
+
+    side_colors = [
+        Vec3(1.0, 0.85, 0.15),
+        Vec3(1.0, 0.45, 0.20),
+        Vec3(0.2, 1.0, 0.9),
+        Vec3(0.9, 0.2, 1.0),
+        Vec3(0.3, 0.9, 0.25),
+        Vec3(0.2, 0.55, 1.0),
+    ]
+
+    idx = 0
+    for i in range(18):
+        z = -9.5 - i * 0.8
+        y_shift = (i % 4) * 0.7 - 1.0
+        color = side_colors[idx % len(side_colors)]
+        idx += 1
+
+        # Left side triangles
+        objects.append(
+            Triangle(
+                Vec3(-14.5, -2.0 + y_shift, z),
+                Vec3(-12.0,  0.6 + y_shift, z - 0.2),
+                Vec3(-13.0,  3.1 + y_shift, z + 0.15),
+                color,
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+        color = side_colors[idx % len(side_colors)]
+        idx += 1
+
+        # Right side triangles
+        objects.append(
+            Triangle(
+                Vec3(14.5, -1.9 + y_shift, z),
+                Vec3(12.0,  0.5 + y_shift, z - 0.2),
+                Vec3(13.0,  3.0 + y_shift, z + 0.15),
+                color,
+                reflection=0.0,
+                transparency=0.0,
+                ior=1.0
+            )
+        )
+
+    # =========================================================
+    # Lower scattered spheres, now more layered in height
+    # =========================================================
+
+    scatter_colors = [
+        Vec3(1.0, 0.2, 0.2),
+        Vec3(0.2, 1.0, 0.2),
+        Vec3(0.2, 0.5, 1.0),
+        Vec3(1.0, 0.9, 0.2),
+        Vec3(1.0, 0.2, 0.9),
+        Vec3(0.2, 1.0, 1.0),
+    ]
+
+    for i in range(24):
+        x = -11.0 + i * 0.95
+        y = -2.0 + (i % 6) * 0.35
+        z = -10.8 - (i % 6) * 0.45
+        color = scatter_colors[i % len(scatter_colors)]
+
+        objects.append(
+            Sphere(Vec3(x, y, z), 0.23, color, 0.04, 0.0, 1.0)
+        )
+
+    # =========================================================
+    # Extra floating background accents
+    # =========================================================
+
+    objects.append(
+        Sphere(
+            Vec3(-6.5, 4.6, -11.5),
+            0.42,
+            Vec3(1.0, 0.85, 0.2),
+            reflection=0.15,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(6.2, 4.4, -11.7),
+            0.42,
+            Vec3(0.2, 0.9, 1.0),
+            reflection=0.15,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+    objects.append(
+        Sphere(
+            Vec3(0.0, 5.4, -12.8),
+            0.36,
+            Vec3(0.95, 0.35, 0.9),
+            reflection=0.18,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    # =========================================================
+    # Floor plane
+    # =========================================================
+
+    objects.append(
+        Plane(
+            Vec3(0, -2.1, 0),
+            Vec3(0, 1, 0),
+            Vec3(0.76, 0.76, 0.80),
+            reflection=0.18,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    return objects, background_color, light_position
+
+# Global feature flags
+use_aabb = True
+blocker_cache_object = None
+use_bvh = True
+bvh_root = None
+
+
+
+objects, background_color, light_position = build_realistic_benchmark_scene()
+
+bvh_objects, non_bvh_objects = split_bvh_objects(objects)
+
+if use_bvh:
+    bvh_root = build_bvh(bvh_objects)
+else:
+    bvh_root = None
+
+
 
 times, average_time = benchmark_render(
     runs=1,
-    width=2000,
-    height=3000,
+    width=200,
+    height=300,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
     depth=0,
     max_depth=4
 )
+
+
+
+
 
 im = Image.open("render.png")
 im.show("Render")

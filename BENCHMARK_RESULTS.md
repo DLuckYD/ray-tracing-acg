@@ -2,106 +2,162 @@
 
 ## Overview
 
-This file summarizes the benchmark results collected for the current Python ray tracer implementation.
+This file summarizes the benchmark results for the current Python ray tracer implementation after introducing **AABB (Axis-Aligned Bounding Boxes)**.
 
-All measurements were performed on the same machine using the same codebase and benchmark setup for each comparison.
+All measurements were performed on the same machine using the same codebase and the same benchmark scene for each comparison.
 
 ## Benchmark Setup
 
-### Scene A — Final complex scene
-Features:
-- many objects
-- reflections
-- refractions
-- shadow rays
-- floor plane
-- recursive ray tracing
+### Scene A — AABB Benchmark Scene
 
-### Scene B — Simplified cache benchmark scene
 Features:
-- large opaque foreground spheres
-- many small background spheres
-- designed to increase primary-ray coherence
-- used to test the effect of primary-ray hit caching
+- many triangles
+- several large foreground spheres
+- no transparent materials in the benchmark focus
+- designed to test object-level bounding box rejection
+- resolution: **500 x 500**
+- number of runs: **10**
+<img width="500" height="500" alt="render" src="https://github.com/user-attachments/assets/05601796-70c3-48e9-bc1d-cdf83b3f2e40" />
 
 ## Tested Optimization
 
-A simple cache-based optimization was implemented for **primary rays**.
+An **AABB-based acceleration step** was added to the ray-object search.
 
-The idea was to:
-- store the previously hit primary object
-- test that object first for the next primary ray
-- then continue with the full nearest-hit search over the remaining objects
+The idea is:
+- each object provides its own bounding box
+- the ray first tests the AABB
+- only if the AABB is hit, the exact object intersection is computed
+
+This reduces unnecessary exact intersection tests, especially for triangles and objects outside the main ray path.
 
 ## Results
 
-### Scene A — Final complex scene
+### Scene A — AABB Benchmark Scene
 
-Without cache:
-- **166.252 s**
+Without AABB:
+- **39.851 s**
 
-With cache:
-- **174.204 s**
-
-Difference:
-- cache version was **7.952 s slower**
-- approximately **4.8% slower**
-
-Interpretation:
-- the cache did not improve performance on the complex scene
-- the scene cost is dominated by secondary rays such as shadows, reflections, and refractions
-- the extra Python-level cache logic outweighed the benefit
-
----
-
-### Scene B — Simplified cache benchmark scene
-
-Without cache:
-- **2.375 s**
-
-With cache:
-- **2.349 s**
+With AABB:
+- **31.788 s**
 
 Difference:
-- cache version was **0.026 s faster**
-- approximately **1.1% faster**
+- AABB version was **8.063 s faster**
+- approximately **20.2% faster**
 
-Interpretation:
-- the cache produced a small positive effect
-- neighboring primary rays were coherent enough to benefit slightly
-- however, the improvement remained very small
+## Interpretation
 
----
+The AABB optimization produced a clear performance improvement in the current benchmark scene.
 
-### Scene C — Repeated simplified benchmark
-
-With cache:
-- **1.982 s**
-
-Without cache:
-- **1.976 s**
-
-Difference:
-- cache version was **0.006 s slower**
-- approximately **0.3% slower**
-
-Interpretation:
-- the result is effectively within the measurement noise range
-- no stable or significant performance improvement was observed
+Main observations:
+- the ray tracer became significantly faster once AABBs were precomputed and reused
+- the key implementation detail was to compute each object's AABB only once and return the stored box instead of rebuilding it during every intersection query
+- triangle-heavy scenes benefit more from AABB than sphere-dominated scenes
+- object-level rejection is already strong enough to produce a visible speedup in Python
 
 ## General Conclusion
 
-The cache-based optimization was implemented correctly from a functional point of view, but in the current Python implementation it did not provide a stable or meaningful speedup.
+AABB is the first acceleration method in the project that showed a **clear and stable improvement**.
 
-Main observations:
-- on the complex scene, the cache made performance worse
-- on the simplified scene, the cache showed either a very small speedup or a result within noise range
-- the optimization effect is limited because the cache only helps primary rays, while complex scenes spend a large amount of time on secondary rays
-- Python overhead reduces the practical benefit of this simple strategy
+Compared to the earlier cache-based optimization, AABB is much more effective because it reduces the number of expensive exact intersection tests instead of only trying to guess a good first candidate.
 
-## Next Step
+The current result suggests that the next logical steps are:
+- hierarchical bounding volumes (HBV / BVH-like structures)
+- spatial partitioning structures
+- kd-trees or related acceleration trees
 
-The current results suggest that more advanced acceleration structures are more promising for future optimization work, for example:
-- uniform grids
-- spatial partitioning
-- other scene acceleration methods discussed in later lectures
+## Extended Benchmark Comparison
+
+After the initial AABB benchmark, an additional comparison was performed on a more realistic scene containing reflective objects, transparent objects, spheres, triangles, and a floor plane.
+
+### Scene B — Realistic Benchmark Scene
+
+Features:
+- reflective spheres
+- transparent spheres
+- multiple triangles
+- floor plane
+- more realistic spatial distribution of objects
+- recursive ray tracing enabled
+- resolution: **200 x 300**
+- number of runs: **10**
+
+<img width="200" height="300" alt="render" src="https://github.com/user-attachments/assets/6b225b2e-144f-47b0-997b-c8b963b0113f" />
+
+## Tested Methods
+
+Three intersection search strategies were compared:
+
+- **Brute Force**  
+  Every ray tests all objects directly.
+
+- **AABB**  
+  Each object provides a precomputed axis-aligned bounding box.  
+  The ray first tests the AABB and only then performs the exact object intersection.
+
+- **BVH**  
+  Objects with finite AABBs are grouped into a bounding volume hierarchy.  
+  Rays first traverse the hierarchy and only test exact object intersections inside relevant leaf nodes.
+
+## Results
+
+### BVH
+
+Average render time:
+- **15.929 s**
+
+### AABB
+
+Average render time:
+- **31.422 s**
+
+### Brute Force
+
+Average render time:
+- **34.940 s**
+
+## Direct Comparison
+
+### AABB vs Brute Force
+
+Difference:
+- AABB was **3.518 s faster**
+- approximately **10.1% faster**
+
+### BVH vs AABB
+
+Difference:
+- BVH was **15.493 s faster**
+- approximately **49.3% faster**
+
+### BVH vs Brute Force
+
+Difference:
+- BVH was **19.011 s faster**
+- approximately **54.4% faster**
+
+## Interpretation
+
+The new benchmark shows a clear hierarchy of effectiveness:
+
+- **Brute Force** is the slowest approach because every ray tests all objects directly.
+- **AABB** improves performance by rejecting some objects before exact intersection tests, but on this realistic scene the gain remains moderate.
+- **BVH** provides the strongest result because it rejects entire groups of objects at once and drastically reduces the number of exact intersection tests.
+
+This confirms that:
+
+- object-level AABB is useful as a first optimization step,
+- but hierarchical grouping of objects is significantly more powerful,
+- especially in scenes with many objects distributed across different depths and heights.
+
+## Updated General Conclusion
+
+The benchmark progression now shows a clear development path:
+
+1. **Brute Force** provides the baseline but scales poorly.
+2. **AABB** gives a measurable improvement and serves as a necessary foundation.
+3. **BVH** produces a major speedup and is the first hierarchical acceleration structure in the project to show strong performance gains.
+
+These results support the next planned step of the project:
+- keep **BVH** as the current strongest acceleration baseline,
+- continue investigating more advanced structures,
+- and later compare them with **kd-trees** or other spatial partitioning methods.

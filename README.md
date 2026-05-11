@@ -1,11 +1,12 @@
 # Ray Tracing in Python
 
-<!-- PLACEHOLDER: Insert render image here -->
-<!-- Example: ![Render](path/to/render.png) -->
+<img width="2000" height="1500" alt="bvh" src="https://github.com/user-attachments/assets/e8c8daaa-495a-4105-890f-24cbffeedc99" />
 
 ## Overview
 
-Educational ray tracer written from scratch in Python to understand the core logic of Whitted-style ray tracing.
+Educational ray tracer written from scratch in Python to explore the core ideas of Whitted-style ray tracing and basic acceleration structures.
+
+The project started as a simple sphere-based ray tracer and was gradually extended with reflections, refractions, triangles, object-level AABB acceleration, and a BVH-based traversal mode.
 
 ## Current Features
 
@@ -13,6 +14,7 @@ Educational ray tracer written from scratch in Python to understand the core log
 - rays with origin and direction
 - sphere intersection
 - plane intersection
+- triangle intersection
 - nearest-hit search
 - simple pinhole camera
 - diffuse + ambient lighting
@@ -21,15 +23,50 @@ Educational ray tracer written from scratch in Python to understand the core log
 - recursive refractions
 - PNG output with Pillow
 - benchmark scene generation
-- initial cache-based optimization for primary rays
+- blocker cache for shadow-ray obstruction tests
+- precomputed AABB for objects
+- BVH-based acceleration structure
 
-## Scene
+## Scene Support
 
-The current project supports spheres, a plane as a floor, one point light source, configurable materials, and benchmark scenes with many objects.
+The current implementation supports:
 
-## How it works
+- spheres
+- triangles
+- an infinite plane used as a floor
+- reflective materials
+- transparent / refractive materials
+- benchmark scenes for both synthetic and more realistic tests
 
-For each pixel, the renderer creates a ray from the camera through the image plane, finds the nearest object hit, computes local lighting, traces reflected and refracted rays recursively, and writes the final color to the image.
+## How It Works
+
+For each pixel, the renderer creates a primary ray from the camera through the virtual image plane.
+
+For the closest hit point, the ray tracer computes:
+
+- local diffuse and ambient lighting
+- shadow visibility using shadow rays
+- recursive reflection rays
+- recursive refraction rays
+
+The final color is built by combining local shading, reflected contribution, and refracted contribution.
+
+## Acceleration Structures
+
+The project currently includes multiple intersection modes:
+
+- **Brute Force**  
+  Every ray tests all objects directly.
+
+- **AABB**  
+  Each object provides a precomputed axis-aligned bounding box.  
+  The ray first tests the bounding box before performing the exact intersection.
+
+- **BVH**  
+  Objects with finite AABBs are grouped into a bounding volume hierarchy.  
+  Rays first traverse the hierarchy and only test exact intersections inside relevant leaf nodes.
+
+These modes can be benchmarked and compared directly.
 
 ## Run
 
@@ -53,48 +90,42 @@ render.png
 
 ## Benchmarking
 
-The project also includes benchmark scenes and timing measurements using Python's `time.perf_counter()`.
+The project includes benchmark scenes and timing measurements using Python's `time.perf_counter()`.
 
-### Tested cache-based optimization
+The benchmark results are documented separately in:
 
-An initial optimization was implemented by caching the previously hit primary object and testing it first for the next primary ray.
+[Benchmark Results](./BENCHMARK_RESULTS.md)
 
-### Results summary
+## Current Benchmark Summary
 
-**Scene A — Final complex scene**
-- many objects, reflections, refractions, shadows, floor plane
-- without cache: **166.252 s**
-- with cache: **174.204 s**
-- result: cache version was about **4.8% slower**
+Recent benchmarks show the following progression:
 
-**Scene B — Simplified cache benchmark scene**
-- large opaque foreground spheres and many small background spheres
-- without cache: **2.375 s**
-- with cache: **2.349 s**
-- result: cache version was about **1.1% faster**
+- **Brute Force** provides the baseline but scales poorly
+- **AABB** gives a measurable speedup by rejecting some objects before exact intersection tests
+- **BVH** provides the strongest improvement by rejecting entire groups of objects at once
 
-**Scene C — Repeated simplified benchmark**
-- with cache: **1.982 s**
-- without cache: **1.976 s**
-- result: difference was about **0.3%**, effectively within measurement noise
+This makes BVH the current best-performing acceleration method in the project.
 
-Full benchmark details: see [Benchmark Results](./BENCHMARK_RESULTS.md).
-
-### Conclusion
-
-The cache-based optimization was implemented correctly, but in the current Python implementation it did not provide a stable or significant speedup. On complex scenes dominated by shadow, reflection, and refraction rays, the additional Python overhead outweighed the benefit. On simplified primary-ray-heavy scenes, the cache showed either a very small improvement or a result within the noise range.
-
-This suggests that more advanced acceleration structures, such as uniform grids or other spatial partitioning methods, are more promising next steps.
-
-## Current limitations
+## Current Limitations
 
 - only one light source
 - no anti-aliasing
-- no acceleration structures yet
-- no mesh loading
-- optimization effect is limited in Python for the current cache approach
+- no mesh loading from external files
+- no texture mapping
+- no Fresnel-based material model yet
+- infinite plane is not included inside BVH
+- Python implementation limits absolute performance compared to lower-level languages
+
+## Next Steps
+
+Planned continuation of the project:
+
+- improve lighting setup
+- investigate kd-tree acceleration
+- compare BVH and kd-tree performance
+- explore more advanced spatial structures
+- later extend the renderer with more complex geometry
 
 ## Render
-Run 1: 1702.197 seconds
-<img width="2000" height="3000" alt="render" src="https://github.com/user-attachments/assets/52e3aaf1-6b53-45fd-b976-4301da81d8f0" />
 
+<img width="2000" height="3000" alt="render" src="https://github.com/user-attachments/assets/52e3aaf1-6b53-45fd-b976-4301da81d8f0" />
