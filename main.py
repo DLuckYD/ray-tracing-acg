@@ -446,28 +446,71 @@ def benchmark_render(runs, width, height, objects, background_color, light_posit
 
 
 def is_shadow_blocked(shadow_ray, objects, distance_to_light):
+    global use_bvh
+    global bvh_root
+    global non_bvh_objects
     global blocker_cache_object
 
-    # 1. First test the object stored in the blocker cache
+    # -----------------------------------------
+    # BVH mode
+    # -----------------------------------------
+    if use_bvh:
+        # Check finite objects inside BVH
+        if bvh_shadow_blocked(shadow_ray, bvh_root, distance_to_light):
+            return True
+
+        # Check non-BVH objects, for example Plane
+        for obj in non_bvh_objects:
+            t = obj.intersect(shadow_ray)
+            if t is not None and t < distance_to_light:
+                return True
+
+        return False
+
+    # -----------------------------------------
+    # Non-BVH mode: blocker cache + brute force
+    # -----------------------------------------
     if blocker_cache_object is not None:
         t = blocker_cache_object.intersect(shadow_ray)
-
         if t is not None and t < distance_to_light:
             return True
 
-    # 2. If the cached object did not block the light,
-    #    test all other objects
     for obj in objects:
         if obj is blocker_cache_object:
             continue
 
         t = obj.intersect(shadow_ray)
-
         if t is not None and t < distance_to_light:
             blocker_cache_object = obj
             return True
 
-    # 3. Nothing blocks the light
+    return False
+
+def bvh_shadow_blocked(shadow_ray, node, distance_to_light):
+    if node is None:
+        return False
+
+    # If the shadow ray does not hit the node box,
+    # nothing inside can block the light
+    if not node.aabb.intersect(shadow_ray):
+        return False
+
+    # Leaf node: test objects directly
+    if node.is_leaf:
+        for obj in node.objects:
+            t = obj.intersect(shadow_ray)
+            if t is not None and t < distance_to_light:
+                return True
+
+        return False
+
+    # Inner node: recurse into children
+    if bvh_shadow_blocked(shadow_ray, node.left, distance_to_light):
+        return True
+
+    if bvh_shadow_blocked(shadow_ray, node.right, distance_to_light):
+        return True
+
     return False
 
 class AABB:
@@ -917,25 +960,161 @@ def benchmark_render_parallel(runs, width, height, objects, background_color, li
 
     return times, average_time
 
+def transform_vertex(vertex, scale, position):
+    return Vec3(
+        vertex.x * scale + position.x,
+        vertex.y * scale + position.y,
+        vertex.z * scale + position.z
+    )
+
+def parse_face_vertex(token):
+    return int(token.split('/')[0]) - 1
+
+def load_obj_as_triangles(filepath, position, scale, color, reflection=0.0, transparency=0.0, ior=1.0):
+    vertices = []
+    triangles = []
+
+    with open(filepath, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+
+            # Skip empty lines and comments
+            if not line or line.startswith("#"):
+                continue
+
+            parts = line.split()
+
+            # -----------------------------------------
+            # Vertex line: v x y z
+            # -----------------------------------------
+            if parts[0] == "v":
+                if len(parts) < 4:
+                    continue
+
+                x = float(parts[1])
+                y = float(parts[2])
+                z = float(parts[3])
+
+                vertices.append(Vec3(x, y, z))
+
+            # -----------------------------------------
+            # Face line: f a b c ...
+            # -----------------------------------------
+            elif parts[0] == "f":
+                face_indices = []
+
+                for token in parts[1:]:
+                    try:
+                        vertex_index = parse_face_vertex(token)
+                        face_indices.append(vertex_index)
+                    except:
+                        continue
+
+                # Ignore broken faces
+                if len(face_indices) < 3:
+                    continue
+
+                # -------------------------------------
+                # Triangle
+                # -------------------------------------
+                if len(face_indices) == 3:
+                    i0, i1, i2 = face_indices
+
+                    v0 = transform_vertex(vertices[i0], scale, position)
+                    v1 = transform_vertex(vertices[i1], scale, position)
+                    v2 = transform_vertex(vertices[i2], scale, position)
+
+                    triangles.append(
+                        Triangle(v0, v1, v2, color, reflection, transparency, ior)
+                    )
+
+                # -------------------------------------
+                # Quad -> split into 2 triangles
+                # -------------------------------------
+                elif len(face_indices) == 4:
+                    i0, i1, i2, i3 = face_indices
+
+                    v0 = transform_vertex(vertices[i0], scale, position)
+                    v1 = transform_vertex(vertices[i1], scale, position)
+                    v2 = transform_vertex(vertices[i2], scale, position)
+                    v3 = transform_vertex(vertices[i3], scale, position)
+
+                    triangles.append(
+                        Triangle(v0, v1, v2, color, reflection, transparency, ior)
+                    )
+                    triangles.append(
+                        Triangle(v0, v2, v3, color, reflection, transparency, ior)
+                    )
+
+                # -------------------------------------
+                # Polygon with more than 4 vertices
+                # Fan triangulation
+                # -------------------------------------
+                else:
+                    i0 = face_indices[0]
+
+                    for k in range(1, len(face_indices) - 1):
+                        i1 = face_indices[k]
+                        i2 = face_indices[k + 1]
+
+                        v0 = transform_vertex(vertices[i0], scale, position)
+                        v1 = transform_vertex(vertices[i1], scale, position)
+                        v2 = transform_vertex(vertices[i2], scale, position)
+
+                        triangles.append(
+                            Triangle(v0, v1, v2, color, reflection, transparency, ior)
+                        )
+
+    print(f"Loaded OBJ file: {filepath}")
+    print(f"Vertices: {len(vertices)}")
+    print(f"Triangles: {len(triangles)}")
+
+    return triangles
+
+def add_obj_to_scene(objects, filepath, position, scale, color, reflection=0.0, transparency=0.0, ior=1.0):
+    mesh_triangles = load_obj_as_triangles(
+        filepath=filepath,
+        position=position,
+        scale=scale,
+        color=color,
+        reflection=reflection,
+        transparency=transparency,
+        ior=ior
+    )
+
+    objects.extend(mesh_triangles)
 
 def build_realistic_benchmark_scene():
     # Main light source
-    light_position = Vec3(-16, 14, 8)
+    light_position = Vec3(0, 7, 8)
 
     # Dark bluish background
     background_color = Vec3(0.3, 0.5, 0.3)
 
     objects = []
 
+
+
     # =========================================================
     # Foreground / hero objects
     # =========================================================
 
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/Sword.obj",
+        position=Vec3(0.0, -0.8, -10.0),
+        scale=0.5,
+        color=Vec3(0.7, 0., 0.7),
+        reflection=0.2,
+        transparency=0.0,
+        ior=1.0
+    )
+
     # Central glass sphere
     objects.append(
         Sphere(
-            Vec3(0.0, 0.8, -6.2),
-            1.45,
+            Vec3(0.0, -2, -6.2),
+            0.7,
             Vec3(0.92, 0.95, 1.0),
             reflection=0.08,
             transparency=0.82,
@@ -987,13 +1166,24 @@ def build_realistic_benchmark_scene():
         )
     )
 
-    # Deep blue sphere behind the glass
+    # Deep blue spheres behind the sword
     objects.append(
         Sphere(
-            Vec3(0.0, -0.1, -9.9),
-            1.3,
+            Vec3(-7.0, 10, -17),
+            4,
             Vec3(0.2, 0.45, 1.0),
-            reflection=0.18,
+            reflection=0.3,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    objects.append(
+        Sphere(
+            Vec3(7.0, 10, -17),
+            4,
+            Vec3(0.2, 0.45, 1.0),
+            reflection=0.3,
             transparency=0.0,
             ior=1.0
         )
@@ -1174,9 +1364,9 @@ def build_realistic_benchmark_scene():
 
     objects.append(
         Triangle(
-            Vec3(-0.9, -1.6, -5.2),
-            Vec3(0.0, 0.1, -5.3),
-            Vec3(1.0, -1.55, -5.1),
+            Vec3(-0.9, -1.6, -4.2),
+            Vec3(0.0, -3, -4.3),
+            Vec3(1.0, -1.55, -4.1),
             Vec3(1.0, 0.35, 0.25),
             reflection=0.12,
             transparency=0.0,
@@ -1297,7 +1487,7 @@ def build_realistic_benchmark_scene():
 
     objects.append(
         Plane(
-            Vec3(0, -2.1, 0),
+            Vec3(0, -4, 0),
             Vec3(0, 1, 0),
             Vec3(0.76, 0.76, 0.80),
             reflection=0.18,
@@ -1423,6 +1613,27 @@ def build_aabb_benchmark_scene():
         )
 
     return objects, background_color, light_position
+def build_obj_test_scene():
+    light_position = Vec3(10, 10, 6)
+    background_color = Vec3(0.08, 0.08, 0.10)
+
+    objects = []
+
+    # =========================================================
+    # Main OBJ object: sword in the center
+    # =========================================================
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/casa.obj",
+        position=Vec3(-1.2, -1, -3.0),
+        scale=0.7,
+        color=Vec3(0.75, 0.78, 0.82),
+        reflection=0.12,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    return objects, background_color, light_position
 # Global feature flags
 use_aabb = True
 blocker_cache_object = None
@@ -1466,30 +1677,40 @@ if __name__ == "__main__":
     available_cpus = os.cpu_count()
     print(f"Available logical CPU threads: {available_cpus}")
 
-    num_workers = 14
-
+    # ---------------------------------
+    # Choose scene
+    # ---------------------------------
     objects, background_color, light_position = build_realistic_benchmark_scene()
 
-    use_aabb = True
-    blocker_cache_object = None
+    print(f"Current amount of objects: {len(objects)}")
+    # ---------------------------------
+    # Choose acceleration mode
+    # ---------------------------------
+    use_aabb = False
     use_bvh = True
-    bvh_root = None
 
+    # Important: rebuild BVH for the current scene
     bvh_objects, non_bvh_objects = split_bvh_objects(objects)
+
     if use_bvh:
         bvh_root = build_bvh(bvh_objects)
     else:
         bvh_root = None
 
+    # ---------------------------------
+    # Choose benchmark mode
+    # ---------------------------------
+    num_workers = 8
+
     times, average_time = benchmark_render_parallel(
-        runs=3,
-        width=2000,
-        height=1500,
+        runs=10,
+        width=900,
+        height=600,
         objects=objects,
         background_color=background_color,
         light_position=light_position,
         depth=0,
-        max_depth=2,
+        max_depth=3,
         num_workers=num_workers
     )
 
