@@ -1,6 +1,6 @@
 # Ray Tracing in Python
 
-<img width="2000" height="1500" alt="bvh" src="https://github.com/user-attachments/assets/e8c8daaa-495a-4105-890f-24cbffeedc99" />
+<img width="3000" height="2000" alt="para_obj" src="https://github.com/user-attachments/assets/08a07af5-a60d-49a6-8575-527973e9c8a9" />
 
 ## Overview
 
@@ -162,6 +162,7 @@ Planned continuation of the project:
 - compare static and dynamic chunk scheduling
 - later extend mesh support with material parsing
 
-## Render
+## Renders
 
 <img width="2000" height="3000" alt="render" src="https://github.com/user-attachments/assets/52e3aaf1-6b53-45fd-b976-4301da81d8f0" />
+<img width="2000" height="1500" alt="bvh" src="https://github.com/user-attachments/assets/e8c8daaa-495a-4105-890f-24cbffeedc99" />
