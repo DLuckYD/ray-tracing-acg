@@ -27,6 +27,8 @@ The goal of this benchmark was to evaluate how the current multiprocessing-based
 
 ### Scene P — OBJ Parallel Benchmark Scene
 
+<img width="900" height="600" alt="render" src="https://github.com/user-attachments/assets/3f830bd6-735b-4198-8743-aeb6caca2a4f" />
+
 Features:
 - OBJ mesh loaded into the scene
 - reflective and transparent objects
@@ -66,9 +68,7 @@ Additional rendering setup:
 
 ## Model Reference
 
-Placeholder for model source link:
-
-- **OBJ model link:** `[PLACEHOLDER: insert model source link here]`
+- **OBJ model link:** (https://free3d.com/3d-model/hand-painted-low-poly-sword-526564.html)
 
 ## Results
 
@@ -130,39 +130,28 @@ This makes multiprocessing an important optimization layer alongside:
 - BVH
 - future load balancing improvements
 
-## Placeholder — Render of One Very Complex Model
-
-This section is reserved for a future benchmark and showcase render using a much more complex OBJ model.
-
-Planned content:
-- model name
-- vertex count
-- triangle count
-- render settings
-- benchmark results
-- final render image
-
-Template:
+## Render of One Very Complex Model
 
 ### Scene H — High-Complexity OBJ Model
 
 Model information:
-- model name: **[PLACEHOLDER]**
-- vertices: **[PLACEHOLDER]**
-- triangles: **[PLACEHOLDER]**
-- source link: **[PLACEHOLDER]**
+- model name: casa.obj
+- vertices: 17158
+- triangles: 33817
+- source link: (https://free3d.com/3d-model/house-in-the-beach-659371.html)
 
 Render settings:
-- width: **[PLACEHOLDER]**
-- height: **[PLACEHOLDER]**
-- max depth: **[PLACEHOLDER]**
-- worker processes: **[PLACEHOLDER]**
+- width: 3000
+- height: 3000
+- max depth: 3
+- worker processes: 10
 
 Benchmark result:
-- average render time: **[PLACEHOLDER]**
+- average render time: 314.539 seconds
+
 
 Render preview:
-- **[PLACEHOLDER: insert image or link here]**
+- <img width="3000" height="3000" alt="house" src="https://github.com/user-attachments/assets/e1b291b7-764a-4d06-8ea2-974f119326de" />
 
 ---
 
@@ -178,7 +167,7 @@ Features:
 - resolution: **500 x 500**
 - number of runs: **10**
 
-![aabb_test.png](aabb_test.png)
+<img width="1200" height="1200" alt="aabb_test" src="https://github.com/user-attachments/assets/06258215-9937-4dff-be41-4e82fe2ef710" />
 
 ## Tested Optimization
 
