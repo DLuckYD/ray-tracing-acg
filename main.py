@@ -4,7 +4,7 @@ from PIL import Image
 import config
 from scenes import build_realistic_benchmark_scene, build_aabb_benchmark_scene
 from bvh import build_bvh, split_bvh_objects
-from parallel import benchmark_render_parallel
+from parallel import benchmark_render_parallel_tiles
 # если parallel пока не вынес:
 # from renderer import benchmark_render_parallel
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     num_workers = 8
 
-    times, average_time = benchmark_render_parallel(
+    times, average_time = benchmark_render_parallel_tiles(
         runs=10,
         width=900,
         height=600,
@@ -38,7 +38,8 @@ if __name__ == "__main__":
         light_position=light_position,
         depth=0,
         max_depth=3,
-        num_workers=num_workers
+        num_workers=num_workers,
+        tile_size=16
     )
 
     im = Image.open("render.png")

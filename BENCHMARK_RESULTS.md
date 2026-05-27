@@ -178,7 +178,7 @@ Features:
 - resolution: **500 x 500**
 - number of runs: **10**
 
-![aabb_test.png](aabb_test.png)
+![aabb_test.png](Pictures/aabb_test.png)
 
 ## Tested Optimization
 
@@ -424,3 +424,124 @@ Main observations:
 - on the simplified scene, the cache showed either a very small speedup or a result within noise range
 - the optimization effect is limited because the cache only helps primary rays, while complex scenes spend a large amount of time on secondary rays
 - Python overhead reduces the practical benefit of this simple strategy
+
+---
+
+## New Benchmark Block — Tile-Based Parallel Rendering with Worker-Local State and Binned SAH BVH
+
+## Overview
+
+This benchmark section summarizes the next major optimization stage of the Python ray tracer.
+
+At this stage, the renderer was improved in three important ways:
+
+- square **16×16 tiles** were used as the main parallel work unit
+- the scene and BVH data were moved into **worker-local state**, so they no longer had to be passed to every task
+- the previous median-split BVH builder was replaced with a **binned SAH BVH** builder
+
+This combination produced a substantial improvement over the earlier parallel BVH baseline.
+
+## Benchmark Setup
+
+### Scene F — Realistic OBJ Benchmark Scene
+
+Features:
+- OBJ mesh loaded into the scene
+- reflective and transparent objects
+- spheres, triangles, and floor plane
+- recursive ray tracing enabled
+- BVH enabled
+
+Scene data:
+- loaded OBJ file: **models/Sword.obj**
+- OBJ vertices: **94**
+- OBJ triangles: **184**
+- total scene objects: **287**
+
+### Benchmark Conditions
+
+The following benchmark configuration was used:
+
+```python
+times, average_time = benchmark_render_parallel_tiles(
+    runs=10,
+    width=900,
+    height=600,
+    objects=objects,
+    background_color=background_color,
+    light_position=light_position,
+    depth=0,
+    max_depth=3,
+    num_workers=8,
+    tile_size=16
+)
+```
+
+Additional configuration:
+- **8 worker processes**
+- **tile size: 16 × 16**
+- **worker-local scene state**
+- **binned SAH BVH**
+- **near-first BVH traversal**
+- benchmark runs: **10**
+
+## Results
+
+Average render time:
+- **10.607 s**
+
+All runs:
+- Run 1: **10.633 s**
+- Run 2: **10.411 s**
+- Run 3: **11.156 s**
+- Run 4: **10.574 s**
+- Run 5: **10.342 s**
+- Run 6: **10.997 s**
+- Run 7: **10.404 s**
+- Run 8: **10.349 s**
+- Run 9: **10.750 s**
+- Run 10: **10.458 s**
+
+## Comparison with Previous Baseline
+
+Previous optimized tile-based baseline:
+- **16.056 s**
+
+New result:
+- **10.607 s**
+
+Difference:
+- **5.449 s faster**
+- approximately **33.9% faster**
+
+## Interpretation
+
+This optimization stage produced a very strong improvement.
+
+Main observations:
+- keeping **16×16 tiles** as the main parallel unit remained the best practical chunking choice
+- moving scene data and BVH data into **worker-local state** reduced multiprocessing overhead
+- replacing the previous simple BVH builder with a **binned SAH BVH** significantly improved traversal efficiency
+- the new BVH structure reduced unnecessary node visits and exact primitive intersection tests
+
+The result shows that the renderer is now substantially faster than the earlier tile-based baseline and is becoming a much stronger foundation for future rendering methods.
+
+## Conclusion
+
+The combination of:
+- **tile-based parallel rendering**
+- **worker-local render state**
+- **near-first BVH traversal**
+- **binned SAH BVH construction**
+
+produced one of the strongest speedups achieved so far in the project.
+
+This version can now be treated as the new high-performance baseline for the next development stage.
+
+## Next Step
+
+Planned continuation:
+- flatten the BVH into an array-based structure (**flat BVH**)
+- reduce Python object traversal overhead
+- prepare the renderer for future **Numba-based acceleration**
+- then move toward **path tracing**

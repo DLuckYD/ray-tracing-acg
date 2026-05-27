@@ -6,73 +6,50 @@ class AABB:
         self.max_point = max_point
 
     def intersect(self, ray):
-        # Small epsilon to avoid division issues when direction is very close to zero
         epsilon = 0.000001
 
-        # ---------------------------------------------------------
-        # X slab
-        # ---------------------------------------------------------
-        # If the ray is almost parallel to the X planes,
-        # then it can hit the box only if its origin.x is already inside the slab.
         if abs(ray.direction.x) < epsilon:
             if ray.origin.x < self.min_point.x or ray.origin.x > self.max_point.x:
-                return False
+                return None
             tx_min = -float("inf")
             tx_max = float("inf")
         else:
             tx1 = (self.min_point.x - ray.origin.x) / ray.direction.x
             tx2 = (self.max_point.x - ray.origin.x) / ray.direction.x
-
-            # tx_min is the entry distance for X, tx_max is the exit distance
             tx_min = min(tx1, tx2)
             tx_max = max(tx1, tx2)
 
-        # ---------------------------------------------------------
-        # Y slab
-        # ---------------------------------------------------------
         if abs(ray.direction.y) < epsilon:
             if ray.origin.y < self.min_point.y or ray.origin.y > self.max_point.y:
-                return False
+                return None
             ty_min = -float("inf")
             ty_max = float("inf")
         else:
             ty1 = (self.min_point.y - ray.origin.y) / ray.direction.y
             ty2 = (self.max_point.y - ray.origin.y) / ray.direction.y
-
             ty_min = min(ty1, ty2)
             ty_max = max(ty1, ty2)
 
-        # ---------------------------------------------------------
-        # Z slab
-        # ---------------------------------------------------------
         if abs(ray.direction.z) < epsilon:
             if ray.origin.z < self.min_point.z or ray.origin.z > self.max_point.z:
-                return False
+                return None
             tz_min = -float("inf")
             tz_max = float("inf")
         else:
             tz1 = (self.min_point.z - ray.origin.z) / ray.direction.z
             tz2 = (self.max_point.z - ray.origin.z) / ray.direction.z
-
             tz_min = min(tz1, tz2)
             tz_max = max(tz1, tz2)
 
-        # ---------------------------------------------------------
-        # Combine intervals from X, Y, Z
-        # ---------------------------------------------------------
-        # The ray must be inside all three slab intervals at the same time.
         t_enter = max(tx_min, ty_min, tz_min)
         t_exit = min(tx_max, ty_max, tz_max)
 
-        # If entry is after exit, intervals do not overlap -> no hit
         if t_enter > t_exit:
-            return False
-
-        # If the whole box is behind the ray origin, we also reject it
+            return None
         if t_exit < 0:
-            return False
+            return None
 
-        return True
+        return t_enter, t_exit
 
 
 
