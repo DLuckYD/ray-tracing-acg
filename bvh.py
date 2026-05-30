@@ -1,5 +1,6 @@
 import config
 from aabb import AABB, compute_objects_aabb, get_largest_axis, get_aabb_center
+from math3d import Vec3
 
 
 LEAF_SIZE = 8
@@ -11,7 +12,7 @@ class BVHNode:
         self.aabb = aabb
         self.left = left
         self.right = right
-        self.objects = objects
+        self.objects = objects if objects is not None else []
         self.is_leaf = is_leaf
 
 
@@ -27,8 +28,7 @@ def get_axis_value(vec, axis):
         return vec.x
     elif axis == 1:
         return vec.y
-    else:
-        return vec.z
+    return vec.z
 
 
 def compute_centroid_bounds(objects):
@@ -65,10 +65,7 @@ def merge_two_aabbs(aabb1, aabb2):
     max_y = max(aabb1.max_point.y, aabb2.max_point.y)
     max_z = max(aabb1.max_point.z, aabb2.max_point.z)
 
-    return AABB(
-        aabb1.min_point.__class__(min_x, min_y, min_z),
-        aabb1.max_point.__class__(max_x, max_y, max_z)
-    )
+    return AABB(Vec3(min_x, min_y, min_z), Vec3(max_x, max_y, max_z))
 
 
 def compute_sah_split(objects, axis, num_bins=NUM_BINS):
@@ -76,7 +73,6 @@ def compute_sah_split(objects, axis, num_bins=NUM_BINS):
         return None
 
     centroid_min, centroid_max = compute_centroid_bounds(objects)
-
     min_axis = centroid_min[axis]
     max_axis = centroid_max[axis]
     extent = max_axis - min_axis
@@ -84,21 +80,14 @@ def compute_sah_split(objects, axis, num_bins=NUM_BINS):
     if extent <= 1e-9:
         return None
 
-    bins = []
-    for _ in range(num_bins):
-        bins.append({
-            "count": 0,
-            "aabb": None,
-        })
+    bins = [{"count": 0, "aabb": None} for _ in range(num_bins)]
 
-    # Put objects into bins
     for obj in objects:
         center = get_aabb_center(obj)
         center_value = get_axis_value(center, axis)
 
         normalized = (center_value - min_axis) / extent
         bin_index = int(normalized * num_bins)
-
         if bin_index == num_bins:
             bin_index = num_bins - 1
 
@@ -110,13 +99,11 @@ def compute_sah_split(objects, axis, num_bins=NUM_BINS):
         else:
             bins[bin_index]["aabb"] = merge_two_aabbs(bins[bin_index]["aabb"], obj_aabb)
 
-    # Prefix from left
     left_count = [0] * num_bins
     left_aabb = [None] * num_bins
 
     running_count = 0
     running_aabb = None
-
     for i in range(num_bins):
         running_count += bins[i]["count"]
         left_count[i] = running_count
@@ -129,13 +116,11 @@ def compute_sah_split(objects, axis, num_bins=NUM_BINS):
 
         left_aabb[i] = running_aabb
 
-    # Prefix from right
     right_count = [0] * num_bins
     right_aabb = [None] * num_bins
 
     running_count = 0
     running_aabb = None
-
     for i in range(num_bins - 1, -1, -1):
         running_count += bins[i]["count"]
         right_count[i] = running_count
@@ -151,11 +136,9 @@ def compute_sah_split(objects, axis, num_bins=NUM_BINS):
     best_cost = None
     best_split_bin = None
 
-    # Split between i and i+1
     for i in range(num_bins - 1):
         count_left = left_count[i]
         count_right = right_count[i + 1]
-
         aabb_left = left_aabb[i]
         aabb_right = right_aabb[i + 1]
 
@@ -193,11 +176,8 @@ def partition_objects_by_split(objects, axis, split_position):
     return left_objects, right_objects
 
 
-def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
-    valid_objects = []
-    for obj in objects:
-        if obj.get_aabb() is not None:
-            valid_objects.append(obj)
+def build_bvh_tree(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
+    valid_objects = [obj for obj in objects if obj.get_aabb() is not None]
 
     if len(valid_objects) == 0:
         return None
@@ -214,10 +194,8 @@ def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
         )
 
     axis = get_largest_axis(node_aabb)
-
     split_position = compute_sah_split(valid_objects, axis, num_bins)
 
-    # Fallback to median split if SAH failed
     if split_position is None:
         if axis == 0:
             valid_objects.sort(key=lambda obj: get_aabb_center(obj).x)
@@ -232,7 +210,6 @@ def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
     else:
         left_objects, right_objects = partition_objects_by_split(valid_objects, axis, split_position)
 
-        # Safety fallback if one side is empty
         if len(left_objects) == 0 or len(right_objects) == 0:
             if axis == 0:
                 valid_objects.sort(key=lambda obj: get_aabb_center(obj).x)
@@ -245,8 +222,8 @@ def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
             left_objects = valid_objects[:mid]
             right_objects = valid_objects[mid:]
 
-    left_node = build_bvh(left_objects, leaf_size, num_bins)
-    right_node = build_bvh(right_objects, leaf_size, num_bins)
+    left_node = build_bvh_tree(left_objects, leaf_size, num_bins)
+    right_node = build_bvh_tree(right_objects, leaf_size, num_bins)
 
     return BVHNode(
         aabb=node_aabb,
@@ -257,74 +234,134 @@ def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
     )
 
 
-def bvh_intersect(ray, node, best_t=None):
-    if node is None:
+def flatten_bvh(root):
+    if root is None:
+        return {
+            "nodes": [],
+            "objects": [],
+            "root_index": -1,
+        }
+
+    flat_nodes = []
+    flat_objects = []
+
+    def recurse(node):
+        node_index = len(flat_nodes)
+        flat_nodes.append(None)
+
+        if node.is_leaf:
+            start = len(flat_objects)
+            count = len(node.objects)
+            flat_objects.extend(node.objects)
+
+            flat_nodes[node_index] = {
+                "aabb": node.aabb,
+                "left": -1,
+                "right": -1,
+                "start": start,
+                "count": count,
+                "is_leaf": True,
+            }
+            return node_index
+
+        left_index = recurse(node.left)
+        right_index = recurse(node.right)
+
+        flat_nodes[node_index] = {
+            "aabb": node.aabb,
+            "left": left_index,
+            "right": right_index,
+            "start": -1,
+            "count": 0,
+            "is_leaf": False,
+        }
+        return node_index
+
+    root_index = recurse(root)
+
+    return {
+        "nodes": flat_nodes,
+        "objects": flat_objects,
+        "root_index": root_index,
+    }
+
+
+def build_bvh(objects, leaf_size=LEAF_SIZE, num_bins=NUM_BINS):
+    tree_root = build_bvh_tree(objects, leaf_size, num_bins)
+    return flatten_bvh(tree_root)
+
+
+def bvh_intersect(ray, flat_bvh, best_t=None):
+    if flat_bvh is None:
+        return None, None
+    if flat_bvh["root_index"] == -1:
         return None, None
 
-    node_hit = node.aabb.intersect(ray)
-    if node_hit is None:
-        return None, None
+    nodes = flat_bvh["nodes"]
+    objects = flat_bvh["objects"]
 
-    node_t_enter, node_t_exit = node_hit
+    stack = [flat_bvh["root_index"]]
+    best_object = None
+    current_best_t = best_t
 
-    if best_t is not None and node_t_enter > best_t:
-        return None, None
+    while stack:
+        node_index = stack.pop()
+        node = nodes[node_index]
 
-    if node.is_leaf:
-        hit_object = None
-        hit_t = best_t
+        node_hit = node["aabb"].intersect(ray)
+        if node_hit is None:
+            continue
 
-        for obj in node.objects:
-            t = obj.intersect(ray)
-            if t is None:
-                continue
+        node_t_enter, _ = node_hit
+        if current_best_t is not None and node_t_enter > current_best_t:
+            continue
 
-            if hit_t is None or t < hit_t:
-                hit_t = t
-                hit_object = obj
+        if node["is_leaf"]:
+            start = node["start"]
+            end = start + node["count"]
 
-        return hit_object, hit_t
+            for i in range(start, end):
+                obj = objects[i]
+                t = obj.intersect(ray)
+                if t is None:
+                    continue
 
-    left_hit = None
-    right_hit = None
+                if current_best_t is None or t < current_best_t:
+                    current_best_t = t
+                    best_object = obj
 
-    if node.left is not None:
-        left_hit = node.left.aabb.intersect(ray)
-    if node.right is not None:
-        right_hit = node.right.aabb.intersect(ray)
+            continue
 
-    if left_hit is None and right_hit is None:
-        return None, None
+        left_index = node["left"]
+        right_index = node["right"]
 
-    if right_hit is None:
-        return bvh_intersect(ray, node.left, best_t)
+        left_hit = nodes[left_index]["aabb"].intersect(ray) if left_index != -1 else None
+        right_hit = nodes[right_index]["aabb"].intersect(ray) if right_index != -1 else None
 
-    if left_hit is None:
-        return bvh_intersect(ray, node.right, best_t)
+        if left_hit is None and right_hit is None:
+            continue
 
-    if left_hit[0] <= right_hit[0]:
-        first_node, second_node = node.left, node.right
-    else:
-        first_node, second_node = node.right, node.left
+        if right_hit is None:
+            stack.append(left_index)
+            continue
 
-    first_obj, first_t = bvh_intersect(ray, first_node, best_t)
+        if left_hit is None:
+            stack.append(right_index)
+            continue
 
-    if first_t is not None:
-        best_t = first_t
-
-    second_obj, second_t = bvh_intersect(ray, second_node, best_t)
-
-    if first_t is not None and second_t is None:
-        return first_obj, first_t
-    if second_t is not None and first_t is None:
-        return second_obj, second_t
-    if first_t is not None and second_t is not None:
-        if first_t <= second_t:
-            return first_obj, first_t
+        if left_hit[0] <= right_hit[0]:
+            near_index, far_index = left_index, right_index
+            far_hit = right_hit
         else:
-            return second_obj, second_t
+            near_index, far_index = right_index, left_index
+            far_hit = left_hit
 
-    return None, None
+        if current_best_t is None or far_hit[0] <= current_best_t:
+            stack.append(far_index)
+
+        stack.append(near_index)
+
+    return best_object, current_best_t
 
 
 def split_bvh_objects(objects):
@@ -369,46 +406,64 @@ def is_shadow_blocked(shadow_ray, objects, distance_to_light):
     return False
 
 
-def bvh_shadow_blocked(shadow_ray, node, distance_to_light):
-    if node is None:
+def bvh_shadow_blocked(shadow_ray, flat_bvh, distance_to_light):
+    if flat_bvh is None:
+        return False
+    if flat_bvh["root_index"] == -1:
         return False
 
-    node_hit = node.aabb.intersect(shadow_ray)
-    if node_hit is None:
-        return False
+    nodes = flat_bvh["nodes"]
+    objects = flat_bvh["objects"]
 
-    node_t_enter, _ = node_hit
-    if node_t_enter > distance_to_light:
-        return False
+    stack = [flat_bvh["root_index"]]
 
-    if node.is_leaf:
-        for obj in node.objects:
-            t = obj.intersect(shadow_ray)
-            if t is not None and t < distance_to_light:
-                return True
-        return False
+    while stack:
+        node_index = stack.pop()
+        node = nodes[node_index]
 
-    left_hit = node.left.aabb.intersect(shadow_ray) if node.left else None
-    right_hit = node.right.aabb.intersect(shadow_ray) if node.right else None
+        node_hit = node["aabb"].intersect(shadow_ray)
+        if node_hit is None:
+            continue
 
-    if left_hit is None and right_hit is None:
-        return False
+        node_t_enter, _ = node_hit
+        if node_t_enter > distance_to_light:
+            continue
 
-    if right_hit is None:
-        return bvh_shadow_blocked(shadow_ray, node.left, distance_to_light)
+        if node["is_leaf"]:
+            start = node["start"]
+            end = start + node["count"]
 
-    if left_hit is None:
-        return bvh_shadow_blocked(shadow_ray, node.right, distance_to_light)
+            for i in range(start, end):
+                obj = objects[i]
+                t = obj.intersect(shadow_ray)
+                if t is not None and t < distance_to_light:
+                    return True
 
-    if left_hit[0] <= right_hit[0]:
-        first_node, second_node = node.left, node.right
-    else:
-        first_node, second_node = node.right, node.left
+            continue
 
-    if bvh_shadow_blocked(shadow_ray, first_node, distance_to_light):
-        return True
+        left_index = node["left"]
+        right_index = node["right"]
 
-    if bvh_shadow_blocked(shadow_ray, second_node, distance_to_light):
-        return True
+        left_hit = nodes[left_index]["aabb"].intersect(shadow_ray) if left_index != -1 else None
+        right_hit = nodes[right_index]["aabb"].intersect(shadow_ray) if right_index != -1 else None
+
+        if left_hit is None and right_hit is None:
+            continue
+
+        if right_hit is None:
+            stack.append(left_index)
+            continue
+
+        if left_hit is None:
+            stack.append(right_index)
+            continue
+
+        if left_hit[0] <= right_hit[0]:
+            near_index, far_index = left_index, right_index
+        else:
+            near_index, far_index = right_index, left_index
+
+        stack.append(far_index)
+        stack.append(near_index)
 
     return False

@@ -2,11 +2,11 @@ import os
 from PIL import Image
 
 import config
-from scenes import build_realistic_benchmark_scene, build_aabb_benchmark_scene
-from bvh import build_bvh, split_bvh_objects
+from scenes import build_obj_test_scene
 from parallel import benchmark_render_parallel_tiles
-# если parallel пока не вынес:
-# from renderer import benchmark_render_parallel
+from triangle_data import build_triangle_data
+from triangle_bvh import build_triangle_bvh
+
 
 if __name__ == "__main__":
     print("Hello")
@@ -14,20 +14,20 @@ if __name__ == "__main__":
     available_cpus = os.cpu_count()
     print(f"Available logical CPU threads: {available_cpus}")
 
-    objects, background_color, light_position = build_realistic_benchmark_scene()
+    objects, background_color, light_position = build_obj_test_scene()
     print(f"Current amount of objects: {len(objects)}")
 
+    config.use_triangle_backend = True
+    config.triangle_data = build_triangle_data(objects)
+    config.triangle_bvh_root = build_triangle_bvh(config.triangle_data)
+
+    # чистый triangle-only режим для этой сцены
     config.use_aabb = False
-    config.use_bvh = True
+    config.use_bvh = False
+    config.bvh_root = None
+    config.non_bvh_objects = []
 
-    bvh_objects, config.non_bvh_objects = split_bvh_objects(objects)
-
-    if config.use_bvh:
-        config.bvh_root = build_bvh(bvh_objects)
-    else:
-        config.bvh_root = None
-
-    num_workers = 8
+    num_workers = 10
 
     times, average_time = benchmark_render_parallel_tiles(
         runs=10,
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         depth=0,
         max_depth=3,
         num_workers=num_workers,
-        tile_size=16
+        tile_size=24
     )
 
     im = Image.open("render.png")

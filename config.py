@@ -12,3 +12,8 @@ scene_background_color = None
 scene_light_position = None
 scene_depth = 0
 scene_max_depth = 0
+
+# triangle backend
+use_triangle_backend = False
+triangle_data = None
+triangle_bvh_root = None
