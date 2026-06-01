@@ -1,5 +1,7 @@
 # Ray Tracing in Python — Optimized Triangle BVH Version
 
+<img width="2200" height="1300" alt="render" src="https://github.com/user-attachments/assets/c060e719-4461-496f-959b-4139c1660d43" />
+
 ## Overview
 
 Educational ray tracer written from scratch in Python to study the core ideas of Whitted-style ray tracing and the practical impact of acceleration structures and performance-oriented refactoring.
