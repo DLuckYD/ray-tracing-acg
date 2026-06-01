@@ -1,6 +1,8 @@
-import config
-from aabb import AABB, compute_objects_aabb, get_largest_axis, get_aabb_center
-from math3d import Vec3
+import logic_scripts.config
+from logic_scripts.aabb import AABB, compute_objects_aabb, get_largest_axis, get_aabb_center
+from logic_scripts.math3d import Vec3
+
+config = logic_scripts.config
 
 
 LEAF_SIZE = 8

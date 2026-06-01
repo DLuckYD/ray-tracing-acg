@@ -1,4 +1,4 @@
-from geometry import Triangle
+from logic_scripts.geometry import Triangle
 import numpy as np
 
 

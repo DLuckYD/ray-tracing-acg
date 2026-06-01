@@ -2,13 +2,14 @@ import math
 import time
 from PIL import Image
 
-import config
-from math3d import Vec3
-from ray import Ray
-from bvh import bvh_intersect, is_shadow_blocked
+import logic_scripts.config
+from logic_scripts.math3d import Vec3
+from logic_scripts.ray import Ray
+from logic_scripts.bvh import bvh_intersect, is_shadow_blocked
 from triangle_logic.triangle_hit import make_triangle_hit_record, hit_record_normal_components
 from triangle_logic.triangle_bvh import triangle_bvh_intersect, triangle_bvh_shadow_blocked
 
+config = logic_scripts.config
 
 def find_closest_hit_triangle_bvh(ray, objects):
     closest_t = None

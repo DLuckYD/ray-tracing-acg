@@ -2,546 +2,376 @@
 
 ## Overview
 
-This file summarizes the benchmark results collected for the current Python ray tracer implementation.
+This document summarizes the **current benchmark state** of the optimized Python ray tracer.
 
-The project has gone through several optimization stages:
-- cache-based experiments
-- object-level AABB acceleration
-- BVH acceleration
-- parallel rendering with Python multiprocessing
+It focuses on the **current implementation**, not the full historical optimization path.  
+The current renderer includes:
+
+- optimized triangle-oriented BVH
+- Numba-accelerated triangle intersection
+- Numba-accelerated AABB traversal
+- Numba-accelerated closest-hit BVH traversal
+- Numba-accelerated shadow traversal
+- tile-based multiprocessing
 - OBJ-based benchmark scenes
 
-All measurements were performed on the same machine using the same codebase and benchmark setup for each comparison.
+This file is intended to describe the **present performance profile** of the renderer and to serve as the current benchmark baseline before the next development stage.
 
 ---
 
-# New Benchmark Block — Parallel Rendering on OBJ Scene
+## Benchmark Environment
 
-## Overview
+### Machine / Software
 
-This section summarizes a new benchmark series focused on **parallel rendering performance** on an OBJ-based test scene.
+- **CPU:** [PLACEHOLDER]
+- **RAM:** [PLACEHOLDER]
+- **Python version:** [PLACEHOLDER]
+- **Operating system:** [PLACEHOLDER]
+- **Numba version:** [PLACEHOLDER]
+- **Numpy version:** [PLACEHOLDER]
 
-The goal of this benchmark was to evaluate how the current multiprocessing-based renderer scales with different numbers of worker processes.
+### Shared Benchmark Settings
 
-## Benchmark Setup
+Unless otherwise noted, the current benchmark runs below use:
 
-### Scene P — OBJ Parallel Benchmark Scene
+- **resolution:** `2000 × 1300`
+- **max depth:** `3`
+- **runs:** `11`
+- **workers:** `10`
+- **tile size:** `24`
 
-Features:
-- OBJ mesh loaded into the scene
-- reflective and transparent objects
-- spheres, triangles, and floor plane
-- BVH enabled
-- realistic recursive ray tracing workload
+### Benchmark Notes
 
-OBJ scene data:
-- loaded OBJ file: **models/Sword.obj**
-- OBJ vertices: **94**
-- OBJ triangles: **184**
-- total scene objects: **287**
-
-### Benchmark Conditions
-
-The following benchmark configuration was used:
-
-```python
-times, average_time = benchmark_render_parallel(
-    runs=10,
-    width=900,
-    height=600,
-    objects=objects,
-    background_color=background_color,
-    light_position=light_position,
-    depth=0,
-    max_depth=3,
-    num_workers=num_workers
-)
-```
-
-Additional rendering setup:
-- parallel renderer
-- chunk-based image splitting
-- total chunks: **120**
-- benchmark runs per worker configuration: **10**
-
-## Model Reference
-
-Placeholder for model source link:
-
-- **OBJ model link:** `[PLACEHOLDER: insert model source link here]`
-
-## Results
-
-### Parallel Rendering Performance by Worker Count
-
-| Worker Processes | Average Time (s) |
-|------------------|------------------|
-| 1                | **74.145**       |
-| 2                | **36.837**       |
-| 4                | **20.108**       |
-| 8                | **11.869**       |
-| 14               | **9.796**        |
-
-## Speedup Relative to 1 Worker
-
-### 2 Workers vs 1 Worker
-- improvement: **37.308 s faster**
-- approximately **50.3% faster**
-
-### 4 Workers vs 1 Worker
-- improvement: **54.037 s faster**
-- approximately **72.9% faster**
-
-### 8 Workers vs 1 Worker
-- improvement: **62.276 s faster**
-- approximately **84.0% faster**
-
-### 14 Workers vs 1 Worker
-- improvement: **64.349 s faster**
-- approximately **86.8% faster**
-
-## Interpretation
-
-The new benchmark shows a strong positive scaling trend for the current multiprocessing-based renderer.
-
-Main observations:
-- moving from **1** to **2** worker processes nearly halves the render time
-- **4 workers** already provide a major speedup over the single-process baseline
-- **8 workers** continue to improve performance significantly
-- **14 workers** provide the best result in the current benchmark setup
-- the scaling is strong, but not perfectly linear, which is expected due to multiprocessing overhead, task scheduling overhead, and result collection costs
-
-These results confirm that:
-- the current chunk-based multiprocessing approach is effective
-- the renderer benefits strongly from CPU parallelization
-- the OBJ-based scene is complex enough to show meaningful scaling behavior
-
-## Current Conclusion for Parallel Rendering
-
-Parallel rendering is now one of the strongest practical optimizations in the project.
-
-Compared to the single-process baseline, the renderer achieves:
-- a **substantial reduction in render time**
-- strong utilization of available logical CPU threads
-- a clear performance benefit on realistic OBJ-based scenes
-
-This makes multiprocessing an important optimization layer alongside:
-- AABB
-- BVH
-- future load balancing improvements
-
-## Placeholder — Render of One Very Complex Model
-
-This section is reserved for a future benchmark and showcase render using a much more complex OBJ model.
-
-Planned content:
-- model name
-- vertex count
-- triangle count
-- render settings
-- benchmark results
-- final render image
-
-Template:
-
-### Scene H — High-Complexity OBJ Model
-
-Model information:
-- model name: **[PLACEHOLDER]**
-- vertices: **[PLACEHOLDER]**
-- triangles: **[PLACEHOLDER]**
-- source link: **[PLACEHOLDER]**
-
-Render settings:
-- width: **[PLACEHOLDER]**
-- height: **[PLACEHOLDER]**
-- max depth: **[PLACEHOLDER]**
-- worker processes: **[PLACEHOLDER]**
-
-Benchmark result:
-- average render time: **[PLACEHOLDER]**
-
-Render preview:
-- **[PLACEHOLDER: insert image or link here]**
+- Averages below include all recorded runs.
+- The first run may include extra warm-up overhead.
+- Where useful, a short comparison with older pre-optimization timings is included.
+- Image placeholders are left in the file so render previews can be inserted later.
 
 ---
 
-## Benchmark Setup
+## Scene 1 — Large OBJ Triangle Benchmark
 
-### Scene A — AABB Benchmark Scene
+### Scene Description
 
-Features:
-- many triangles
-- several large foreground spheres
-- no transparent materials in the benchmark focus
-- designed to test object-level bounding box rejection
-- resolution: **500 x 500**
-- number of runs: **10**
+This scene is the main **triangle-heavy benchmark** of the current project.  
+It is used to evaluate the optimized triangle BVH path on a large imported OBJ mesh.
 
-![aabb_test.png](Pictures/aabb_test.png)
+### Scene Data
 
-## Tested Optimization
+- **scene name:** `build_obj_test_scene()`
+- **model file:** `casa.obj`
+- **vertices:** `17158`
+- **triangles:** `33817`
+- **total renderable objects:** `33817`
+- **contains non-triangle objects:** `No`
 
-An **AABB-based acceleration step** was added to the ray-object search.
-
-The idea is:
-- each object provides its own bounding box
-- the ray first tests the AABB
-- only if the AABB is hit, the exact object intersection is computed
-
-This reduces unnecessary exact intersection tests, especially for triangles and objects outside the main ray path.
-
-## Results
-
-### Scene A — AABB Benchmark Scene
-
-Without AABB:
-- **39.851 s**
-
-With AABB:
-- **31.788 s**
-
-Difference:
-- AABB version was **8.063 s faster**
-- approximately **20.2% faster**
-
-## Interpretation
-
-The AABB optimization produced a clear performance improvement in the current benchmark scene.
-
-Main observations:
-- the ray tracer became significantly faster once AABBs were precomputed and reused
-- the key implementation detail was to compute each object's AABB only once and return the stored box instead of rebuilding it during every intersection query
-- triangle-heavy scenes benefit more from AABB than sphere-dominated scenes
-- object-level rejection is already strong enough to produce a visible speedup in Python
-
-## General Conclusion
-
-AABB is the first acceleration method in the project that showed a **clear and stable improvement**.
-
-Compared to the earlier cache-based optimization, AABB is much more effective because it reduces the number of expensive exact intersection tests instead of only trying to guess a good first candidate.
-
-The current result suggests that the next logical steps are:
-- hierarchical bounding volumes (HBV / BVH-like structures)
-- spatial partitioning structures
-- kd-trees or related acceleration trees
-
-## Next Step
-
-Planned continuation:
-- keep AABB as the new baseline optimization
-- experiment with hierarchical bounding volumes
-- then investigate tree-based acceleration structures such as kd-trees
-
----
-
-## Extended Benchmark Comparison
-
-After the initial AABB benchmark, an additional comparison was performed on a more realistic scene containing reflective objects, transparent objects, spheres, triangles, and a floor plane.
-
-### Scene B — Realistic Benchmark Scene
-
-Features:
-- reflective spheres
-- transparent spheres
-- multiple triangles
-- floor plane
-- more realistic spatial distribution of objects
-- recursive ray tracing enabled
-- resolution: **300 x 300**
-- number of runs: **10**
-
-## Tested Methods
-
-Three intersection search strategies were compared:
-
-- **Brute Force**  
-  Every ray tests all objects directly.
-
-- **AABB**  
-  Each object provides a precomputed axis-aligned bounding box.  
-  The ray first tests the AABB and only then performs the exact object intersection.
-
-- **BVH**  
-  Objects with finite AABBs are grouped into a bounding volume hierarchy.  
-  Rays first traverse the hierarchy and only test exact intersections inside relevant leaf nodes.
-
-## Results
-
-### BVH
-
-Average render time:
-- **15.929 s**
-
-### AABB
-
-Average render time:
-- **31.422 s**
-
-### Brute Force
-
-Average render time:
-- **34.940 s**
-
-## Direct Comparison
-
-### AABB vs Brute Force
-
-Difference:
-- AABB was **3.518 s faster**
-- approximately **10.1% faster**
-
-### BVH vs AABB
-
-Difference:
-- BVH was **15.493 s faster**
-- approximately **49.3% faster**
-
-### BVH vs Brute Force
-
-Difference:
-- BVH was **19.011 s faster**
-- approximately **54.4% faster**
-
-## Interpretation
-
-The new benchmark shows a clear hierarchy of effectiveness:
-
-- **Brute Force** is the slowest approach because every ray tests all objects directly.
-- **AABB** improves performance by rejecting some objects before exact intersection tests, but on this realistic scene the gain remains moderate.
-- **BVH** provides the strongest result because it rejects entire groups of objects at once and drastically reduces the number of exact intersection tests.
-
-This confirms that:
-
-- object-level AABB is useful as a first optimization step,
-- but hierarchical grouping of objects is significantly more powerful,
-- especially in scenes with many objects distributed across different depths and heights.
-
-## Updated General Conclusion
-
-The benchmark progression now shows a clear development path:
-
-1. **Brute Force** provides the baseline but scales poorly.
-2. **AABB** gives a measurable improvement and serves as a necessary foundation.
-3. **BVH** produces a major speedup and is the first hierarchical acceleration structure in the project to show strong performance gains.
-
-These results support the next planned step of the project:
-- keep **BVH** as the current strongest acceleration baseline,
-- continue investigating more advanced structures,
-- and later compare them with **kd-trees** or other spatial partitioning methods.
-
----
-
-## Previous Cache-Based Benchmark Setup
-
-### Scene C — Final complex scene
-Features:
-- many objects
-- reflections
-- refractions
-- shadow rays
-- floor plane
-- recursive ray tracing
-
-### Scene D — Simplified cache benchmark scene
-Features:
-- large opaque foreground spheres
-- many small background spheres
-- designed to increase primary-ray coherence
-- used to test the effect of primary-ray hit caching
-
-## Tested Cache-Based Optimization
-
-A simple cache-based optimization was implemented for **primary rays**.
-
-The idea was to:
-- store the previously hit primary object
-- test that object first for the next primary ray
-- then continue with the full nearest-hit search over the remaining objects
-
-## Cache Benchmark Results
-
-### Scene C — Final complex scene
-
-Without cache:
-- **166.252 s**
-
-With cache:
-- **174.204 s**
-
-Difference:
-- cache version was **7.952 s slower**
-- approximately **4.8% slower**
-
-Interpretation:
-- the cache did not improve performance on the complex scene
-- the scene cost is dominated by secondary rays such as shadows, reflections, and refractions
-- the extra Python-level cache logic outweighed the benefit
-
----
-
-### Scene D — Simplified cache benchmark scene
-
-Without cache:
-- **2.375 s**
-
-With cache:
-- **2.349 s**
-
-Difference:
-- cache version was **0.026 s faster**
-- approximately **1.1% faster**
-
-Interpretation:
-- the cache produced a small positive effect
-- neighboring primary rays were coherent enough to benefit slightly
-- however, the improvement remained very small
-
----
-
-### Scene E — Repeated simplified benchmark
-
-With cache:
-- **1.982 s**
-
-Without cache:
-- **1.976 s**
-
-Difference:
-- cache version was **0.006 s slower**
-- approximately **0.3% slower**
-
-Interpretation:
-- the result is effectively within the measurement noise range
-- no stable or significant performance improvement was observed
-
-## Cache Benchmark Conclusion
-
-The cache-based optimization was implemented correctly from a functional point of view, but in the current Python implementation it did not provide a stable or meaningful speedup.
-
-Main observations:
-- on the complex scene, the cache made performance worse
-- on the simplified scene, the cache showed either a very small speedup or a result within noise range
-- the optimization effect is limited because the cache only helps primary rays, while complex scenes spend a large amount of time on secondary rays
-- Python overhead reduces the practical benefit of this simple strategy
-
----
-
-## New Benchmark Block — Tile-Based Parallel Rendering with Worker-Local State and Binned SAH BVH
-
-## Overview
-
-This benchmark section summarizes the next major optimization stage of the Python ray tracer.
-
-At this stage, the renderer was improved in three important ways:
-
-- square **16×16 tiles** were used as the main parallel work unit
-- the scene and BVH data were moved into **worker-local state**, so they no longer had to be passed to every task
-- the previous median-split BVH builder was replaced with a **binned SAH BVH** builder
-
-This combination produced a substantial improvement over the earlier parallel BVH baseline.
-
-## Benchmark Setup
-
-### Scene F — Realistic OBJ Benchmark Scene
-
-Features:
-- OBJ mesh loaded into the scene
-- reflective and transparent objects
-- spheres, triangles, and floor plane
-- recursive ray tracing enabled
-- BVH enabled
-
-Scene data:
-- loaded OBJ file: **models/Sword.obj**
-- OBJ vertices: **94**
-- OBJ triangles: **184**
-- total scene objects: **287**
-
-### Benchmark Conditions
-
-The following benchmark configuration was used:
+### Render Settings
 
 ```python
 times, average_time = benchmark_render_parallel_tiles(
-    runs=10,
-    width=900,
-    height=600,
+    runs=11,
+    width=2000,
+    height=1300,
     objects=objects,
     background_color=background_color,
     light_position=light_position,
     depth=0,
     max_depth=3,
-    num_workers=8,
-    tile_size=16
+    num_workers=10,
+    tile_size=24
 )
 ```
 
-Additional configuration:
-- **8 worker processes**
-- **tile size: 16 × 16**
-- **worker-local scene state**
-- **binned SAH BVH**
-- **near-first BVH traversal**
-- benchmark runs: **10**
-
-## Results
-
-Average render time:
-- **10.607 s**
+### Results
 
 All runs:
-- Run 1: **10.633 s**
-- Run 2: **10.411 s**
-- Run 3: **11.156 s**
-- Run 4: **10.574 s**
-- Run 5: **10.342 s**
-- Run 6: **10.997 s**
-- Run 7: **10.404 s**
-- Run 8: **10.349 s**
-- Run 9: **10.750 s**
-- Run 10: **10.458 s**
 
-## Comparison with Previous Baseline
+- Run 1: `10.008 s`
+- Run 2: `10.074 s`
+- Run 3: `10.612 s`
+- Run 4: `10.474 s`
+- Run 5: `10.558 s`
+- Run 6: `10.420 s`
+- Run 7: `10.480 s`
+- Run 8: `10.611 s`
+- Run 9: `10.368 s`
+- Run 10: `10.669 s`
+- Run 11: `10.648 s`
 
-Previous optimized tile-based baseline:
-- **16.056 s**
+Summary:
 
-New result:
-- **10.607 s**
+- **average runtime over all runs:** `10.448 s`
+- **best run:** `10.008 s`
+- **worst run:** `10.669 s`
 
-Difference:
-- **5.449 s faster**
-- approximately **33.9% faster**
+### Comparison with Earlier Version
 
-## Interpretation
+Older result mentioned for this scene:
 
-This optimization stage produced a very strong improvement.
+- **older timing:** `314.539 s`
+- **older settings:** `3000 × 3000`, max depth `3`, workers `10`
+
+This older number was produced before the current optimized triangle-oriented version and is kept here only as a rough historical comparison point.
+
+### Render Preview
+
+- **[PLACEHOLDER: insert render image here]**
+
+### Notes
+
+- This is the main benchmark scene for the optimized triangle BVH implementation.
+- It represents the strongest current large-OBJ test case in the project.
+- A separate worker/tile-size sweep for this scene is reserved below.
+
+---
+
+## Scene 2 — Showcase Scene
+
+### Scene Description
+
+This is the current **showcase / visual scene** used for more artistic rendering.  
+It contains multiple imported models and a more decorative composition than the pure benchmark scene.
+
+Scene composition includes:
+
+- pedestal
+- sword
+- arch
+- urn / brazier
+- crystals
+- repeated decorative trees
+- reflective and transparent materials
+
+### Scene Data
+
+- **scene name:** `build_showcase_scene_v3()`
+- **scene type:** `mixed OBJ showcase`
+- **total renderable objects:** `20875`
+- **contains multiple imported models:** `Yes`
+
+Loaded model data from the run:
+
+- `pedestal.obj` — 532 vertices / 668 triangles
+- `greatSword.obj` — 261 vertices / 518 triangles
+- `arch.obj` — 1215 vertices / 2424 triangles
+- `stone_pedestal.obj` — 173 vertices / 275 triangles
+- `NeoUrn.obj` — 1696 vertices / 1931 triangles
+- `Brazier.obj` — 676 vertices / 1237 triangles
+- `Crystals.obj` — 312 vertices / 520 triangles
+- `crystal_1.obj` — 496 vertices / 526 triangles
+- `tree.obj` — 563 vertices / 850 triangles
+
+### Render Settings
+
+```python
+times, average_time = benchmark_render_parallel_tiles(
+    runs=11,
+    width=2000,
+    height=1300,
+    objects=objects,
+    background_color=background_color,
+    light_position=light_position,
+    depth=0,
+    max_depth=3,
+    num_workers=10,
+    tile_size=24
+)
+```
+
+### Results
+
+All runs:
+
+- Run 1: `14.769 s`
+- Run 2: `14.298 s`
+- Run 3: `14.576 s`
+- Run 4: `16.660 s`
+- Run 5: `16.025 s`
+- Run 6: `15.070 s`
+- Run 7: `14.824 s`
+- Run 8: `14.394 s`
+- Run 9: `14.586 s`
+- Run 10: `14.316 s`
+- Run 11: `14.599 s`
+
+Summary:
+
+- **average runtime over all runs:** `14.920 s`
+- **best run:** `14.298 s`
+- **worst run:** `16.660 s`
+
+### Comparison with Earlier Version
+
+Older result mentioned for this scene:
+
+- **older timing:** `391.229 s`
+
+This older number comes from a previous state of the renderer and is kept here only as a rough historical comparison reference.
+
+### Render Preview
+
+- **[PLACEHOLDER: insert render image here]**
+
+### Notes
+
+- This scene is visually richer than the pure triangle benchmark and is better suited for presentation renders.
+- Runtime is less stable than the `casa.obj` benchmark scene, which is expected for a more complex mixed showcase composition.
+- This scene is useful both as a benchmark and as a visual demonstration of the renderer.
+
+---
+
+## Scene 3 — Mixed Recursive Benchmark Scene
+
+### Scene Description
+
+This scene is a **mixed recursive ray tracing benchmark** with:
+- one imported OBJ sword
+- many spheres
+- many triangles
+- plane surface
+- reflections
+- refractions
+
+It is useful because it is not purely an OBJ-heavy triangle benchmark.  
+Instead, it shows how the renderer behaves in a more classical Whitted-style recursive scene.
+
+### Scene Data
+
+- **scene name:** `build_realistic_benchmark_scene()`
+- **OBJ file:** `Sword.obj`
+- **OBJ vertices:** `94`
+- **OBJ triangles:** `184`
+- **total renderable objects:** `287`
+- **scene composition:** `mixed primitives + triangles + recursion-heavy shading`
+
+### Render Settings
+
+```python
+times, average_time = benchmark_render_parallel_tiles(
+    runs=11,
+    width=2000,
+    height=1300,
+    objects=objects,
+    background_color=background_color,
+    light_position=light_position,
+    depth=0,
+    max_depth=3,
+    num_workers=10,
+    tile_size=24
+)
+```
+
+### Results
+
+All runs:
+
+- Run 1: `60.340 s`
+- Run 2: `67.841 s`
+- Run 3: `68.032 s`
+- Run 4: `67.706 s`
+- Run 5: `67.723 s`
+- Run 6: `67.858 s`
+- Run 7: `68.069 s`
+- Run 8: `67.701 s`
+- Run 9: `67.831 s`
+- Run 10: `67.968 s`
+- Run 11: `67.616 s`
+
+Summary:
+
+- **average runtime over all runs:** `67.153 s`
+- **best run:** `60.340 s`
+- **worst run:** `68.069 s`
+
+### Comparison with Earlier Version
+
+Older benchmark memory for this scene:
+
+- **older average result:** about `9.7 s`
+- **older settings:** `900 × 600`, `14` workers
+
+This older value belongs to a different renderer state and significantly lower resolution.  
+The current result is therefore not a direct one-to-one comparison, but it still shows that the current renderer is now much more specialized for triangle-heavy OBJ workloads than for this older mixed recursive benchmark.
+
+### Render Preview
+
+- **[PLACEHOLDER: insert render image here]**
+
+### Notes
+
+- This scene remains useful because it stresses recursion, shadows, reflections, and refractions more strongly than the triangle-only benchmark.
+- It is a good reminder that the current optimization stage is strongly oriented toward triangle-heavy scenes.
+- It should be kept as a secondary benchmark, not the main current baseline.
+
+---
+
+## Reserved Block — Worker / Tile Sweep on `casa.obj`
+
+This section is reserved for later parameter tuning on the main OBJ benchmark scene.
+
+### Planned Sweep
+
+The following combinations can be tested later:
+
+- worker count sweep
+- tile size sweep
+- worker count × tile size grid
+
+### Worker Sweep Table
+
+| Workers | Tile Size | Average Time (s) | Notes |
+|---------|-----------|------------------|-------|
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+
+### Tile Size Sweep Table
+
+| Tile Size | Workers | Average Time (s) | Notes |
+|-----------|---------|------------------|-------|
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+| [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+
+### Practical Best Configuration
+
+- **scene:** `casa.obj`
+- **best worker count:** [PLACEHOLDER]
+- **best tile size:** [PLACEHOLDER]
+- **best measured average:** [PLACEHOLDER]
+
+---
+
+## Current Practical Conclusion
+
+The current optimized renderer performs best on the large triangle-heavy OBJ benchmark scene.
+
+The current practical baseline is:
+
+- **primary benchmark scene:** `casa.obj`
+- **resolution:** `2000 × 1300`
+- **max depth:** `3`
+- **workers:** `10`
+- **tile size:** `24`
+- **average runtime:** `10.448 s`
 
 Main observations:
-- keeping **16×16 tiles** as the main parallel unit remained the best practical chunking choice
-- moving scene data and BVH data into **worker-local state** reduced multiprocessing overhead
-- replacing the previous simple BVH builder with a **binned SAH BVH** significantly improved traversal efficiency
-- the new BVH structure reduced unnecessary node visits and exact primitive intersection tests
 
-The result shows that the renderer is now substantially faster than the earlier tile-based baseline and is becoming a much stronger foundation for future rendering methods.
+- the optimized renderer now performs strongest on triangle-heavy OBJ workloads
+- the showcase scene remains a useful visual benchmark and still renders in a practical time range
+- the mixed recursive benchmark scene is much heavier and highlights that the current optimization stage is specialized toward triangle BVH workloads more than toward the older mixed-scene benchmark style
 
-## Conclusion
-
-The combination of:
-- **tile-based parallel rendering**
-- **worker-local render state**
-- **near-first BVH traversal**
-- **binned SAH BVH construction**
-
-produced one of the strongest speedups achieved so far in the project.
-
-This version can now be treated as the new high-performance baseline for the next development stage.
+---
 
 ## Next Step
 
-Planned continuation:
-- flatten the BVH into an array-based structure (**flat BVH**)
-- reduce Python object traversal overhead
-- prepare the renderer for future **Numba-based acceleration**
-- then move toward **path tracing**
+The current benchmark stage establishes the optimized BVH-based version as the new baseline.
+
+Planned next steps:
+
+- add richer object transformations
+- add texture support
+- add profiling / stage timing analysis
+- continue performance analysis on large scenes
+- perform explicit worker/tile sweeps on the main OBJ scene
+- move toward path tracing

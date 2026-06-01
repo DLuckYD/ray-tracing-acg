@@ -1,4 +1,4 @@
-from math3d import Vec3
+from logic_scripts.math3d import Vec3
 
 class AABB:
     def __init__(self, min_point, max_point):

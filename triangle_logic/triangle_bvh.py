@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit
-from triangle_intersect import intersect_triangle_kernel
+from triangle_logic.triangle_intersect import intersect_triangle_kernel
 
 
 TRIANGLE_LEAF_SIZE = 8

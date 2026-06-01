@@ -2,11 +2,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from PIL import Image
 import time
 
-import config
-from math3d import Vec3
-from ray import Ray
-from renderer import trace_ray
+import logic_scripts.config
+from logic_scripts.math3d import Vec3
+from logic_scripts.ray import Ray
+from logic_scripts.renderer import trace_ray
 
+config = logic_scripts.config
 
 def init_worker(
     objects,

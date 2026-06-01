@@ -1,6 +1,6 @@
 import math
-from math3d import Vec3
-from aabb import AABB
+from logic_scripts.math3d import Vec3
+from logic_scripts.aabb import AABB
 
 class Sphere:
     def __init__(self, center, radius, color, reflection = 0.0, transparency = 0.0, ior = 1.0):

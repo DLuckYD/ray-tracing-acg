@@ -1,5 +1,6 @@
-from math3d import Vec3
-from geometry import Triangle
+from logic_scripts.math3d import Vec3
+from logic_scripts.geometry import Triangle
+from pathlib import Path
 
 
 def transform_vertex(vertex, scale, position):
@@ -13,10 +14,11 @@ def parse_face_vertex(token):
     return int(token.split('/')[0]) - 1
 
 def load_obj_as_triangles(filepath, position, scale, color, reflection=0.0, transparency=0.0, ior=1.0):
+    models_dir = Path(__file__).resolve().parent.parent / "models"
+    full_path = models_dir / filepath
     vertices = []
     triangles = []
-
-    with open(filepath, "r", encoding="utf-8") as file:
+    with open(full_path, "r", encoding="utf-8") as file:
         for line in file:
             line = line.strip()
 
