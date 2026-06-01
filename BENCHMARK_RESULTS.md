@@ -23,12 +23,12 @@ This file is intended to describe the **present performance profile** of the ren
 
 ### Machine / Software
 
-- **CPU:** [PLACEHOLDER]
-- **RAM:** [PLACEHOLDER]
-- **Python version:** [PLACEHOLDER]
-- **Operating system:** [PLACEHOLDER]
-- **Numba version:** [PLACEHOLDER]
-- **Numpy version:** [PLACEHOLDER]
+- **CPU:** AMD Ryzen 7 7800X3D ( 8 Cores And 16 Threads )
+- **RAM:** G.Skill Trident Z5 32 GB 2 x 16 GB DDR5 (4800 MT/s)
+- **Python version:** 3.12.3
+- **Operating system:** Windows 11 Home 25H2
+- **Numba version:** 0.65.1
+- **Numpy version:** 2.4.6
 
 ### Shared Benchmark Settings
 
@@ -115,7 +115,8 @@ This older number was produced before the current optimized triangle-oriented ve
 
 ### Render Preview
 
-- **[PLACEHOLDER: insert render image here]**
+<img width="2000" height="1300" alt="render_1" src="https://github.com/user-attachments/assets/ac4f66ca-d6db-4fc0-9d35-1777056866cd" />
+
 
 ### Notes
 
@@ -210,7 +211,8 @@ This older number comes from a previous state of the renderer and is kept here o
 
 ### Render Preview
 
-- **[PLACEHOLDER: insert render image here]**
+<img width="2000" height="1300" alt="render_2" src="https://github.com/user-attachments/assets/f1f878f3-2809-4103-9e84-63cba33e5daa" />
+
 
 ### Notes
 
@@ -295,7 +297,8 @@ The current result is therefore not a direct one-to-one comparison, but it still
 
 ### Render Preview
 
-- **[PLACEHOLDER: insert render image here]**
+<img width="2000" height="1300" alt="render_3" src="https://github.com/user-attachments/assets/3808d010-8d3e-4af2-a1fa-0247145926ce" />
+
 
 ### Notes
 
