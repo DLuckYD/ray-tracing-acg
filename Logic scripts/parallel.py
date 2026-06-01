@@ -145,20 +145,20 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
         max_workers=num_workers,
         initializer=init_worker,
         initargs=(
-            objects,
-            background_color,
-            light_position,
-            depth,
-            max_depth,
-            config.use_aabb,
-            config.use_bvh,
-            config.bvh_root,
-            config.non_bvh_objects,
-            config.use_triangle_backend,
-            config.triangle_data,
-            config.triangle_bvh_root,
-            screen_x_values,
-            screen_y_values
+                objects,
+                background_color,
+                light_position,
+                depth,
+                max_depth,
+                config.use_aabb,
+                config.use_bvh,
+                config.bvh_root,
+                config.non_bvh_objects,
+                config.use_triangle_backend,
+                config.triangle_data,
+                config.triangle_bvh_root,
+                screen_x_values,
+                screen_y_values
         )
     ) as executor:
         futures = [executor.submit(render_tile_chunk, args) for args in task_args]

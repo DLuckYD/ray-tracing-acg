@@ -2,10 +2,10 @@ import os
 from PIL import Image
 
 import config
-from scenes import build_obj_test_scene, build_showcase_scene_v3
+from scenes import build_showcase_scene_v3
 from parallel import benchmark_render_parallel_tiles
-from triangle_data import build_triangle_data
-from triangle_bvh import build_triangle_bvh
+from triangle_logic.triangle_data import build_triangle_data
+from triangle_logic.triangle_bvh import build_triangle_bvh
 
 
 if __name__ == "__main__":
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     available_cpus = os.cpu_count()
     print(f"Available logical CPU threads: {available_cpus}")
 
-    objects, background_color, light_position = build_obj_test_scene()
+    objects, background_color, light_position = build_showcase_scene_v3()
     print(f"Current amount of objects: {len(objects)}")
 
     config.use_triangle_backend = True
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     num_workers = 10
 
     times, average_time = benchmark_render_parallel_tiles(
-        runs=10,
+        runs=1,
         width=2200,
         height=1300,
         objects=objects,

@@ -728,7 +728,7 @@ def build_realistic_benchmark_scene():
 
     add_obj_to_scene(
         objects=objects,
-        filepath="models/Sword.obj",
+        filepath="../models/Sword.obj",
         position=Vec3(0.0, -0.8, -10.0),
         scale=0.5,
         color=Vec3(0.7, 0., 0.7),
@@ -1251,7 +1251,7 @@ def build_obj_test_scene():
     # =========================================================
     add_obj_to_scene(
         objects=objects,
-        filepath="models/casa.obj",
+        filepath="../models/casa.obj",
         position=Vec3(-1.2, -1, -3.0),
         scale=0.7,
         color=Vec3(0.75, 0.78, 0.82),
@@ -1275,7 +1275,7 @@ def build_showcase_scene_v3():
     # Main pedestal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/Pedestal.obj",
+        filepath="../models/Pedestal.obj",
         position=Vec3(0.0, -3.0, -4.3),
         scale=0.005,
         color=Vec3(0.72, 0.72, 0.74),
@@ -1287,7 +1287,7 @@ def build_showcase_scene_v3():
     # Main sword - dark mirror metal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/greatSword.obj",
+        filepath="../models/greatSword.obj",
         position=Vec3(0.0, -0.3, -4.0),
         scale=0.02,
         color=Vec3(0.50, 0.53, 0.58),
@@ -1299,7 +1299,7 @@ def build_showcase_scene_v3():
     # Main arch - mirror stone / polished reflective arch
     add_obj_to_scene(
         objects=objects,
-        filepath="models/arch.obj",
+        filepath="../models/arch.obj",
         position=Vec3(0.0, 0.2, -7.0),
         scale=5.0,
         color=Vec3(0.78, 0.80, 0.84),
@@ -1315,7 +1315,7 @@ def build_showcase_scene_v3():
     # Left stone pedestal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/stone_pedestal.obj",
+        filepath="../models/stone_pedestal.obj",
         position=Vec3(-3.8, -3.0, -4.5),
         scale=0.01,
         color=Vec3(0.58, 0.58, 0.60),
@@ -1327,7 +1327,7 @@ def build_showcase_scene_v3():
     # Right stone pedestal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/stone_pedestal.obj",
+        filepath="../models/stone_pedestal.obj",
         position=Vec3(3.8, -3.0, -4.5),
         scale=0.01,
         color=Vec3(0.58, 0.58, 0.60),
@@ -1339,7 +1339,7 @@ def build_showcase_scene_v3():
     # Left urn - polished stone
     add_obj_to_scene(
         objects=objects,
-        filepath="models/NeoUrn.obj",
+        filepath="../models/NeoUrn.obj",
         position=Vec3(-3.8, -3.0, -6.4),
         scale=0.15,
         color=Vec3(0.66, 0.60, 0.50),
@@ -1351,7 +1351,7 @@ def build_showcase_scene_v3():
     # Right brazier - bronze / darker metal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/Brazier.obj",
+        filepath="../models/Brazier.obj",
         position=Vec3(3.8, -3.0, -6.7),
         scale=0.007,
         color=Vec3(0.45, 0.24, 0.10),
@@ -1367,7 +1367,7 @@ def build_showcase_scene_v3():
     # Large cluster left of pedestal - transparent sapphire
     add_obj_to_scene(
         objects=objects,
-        filepath="models/Crystals.obj",
+        filepath="../models/Crystals.obj",
         position=Vec3(-1.0, 0.0, -5.1),
         scale=3,
         color=Vec3(0.16, 0.45, 0.95),
@@ -1379,7 +1379,7 @@ def build_showcase_scene_v3():
     # Large cluster right of pedestal - metallic blue crystal
     add_obj_to_scene(
         objects=objects,
-        filepath="models/Crystals.obj",
+        filepath="../models/Crystals.obj",
         position=Vec3(1.0, 0.0, -5.15),
         scale=3,
         color=Vec3(0.10, 0.28, 0.75),
@@ -1391,7 +1391,7 @@ def build_showcase_scene_v3():
     # Front-left crystal - transparent sapphire
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(-3.8, -2.5, -4.5),
         scale=2,
         color=Vec3(0.18, 0.52, 1.0),
@@ -1403,7 +1403,7 @@ def build_showcase_scene_v3():
     # Front-right crystal - metallic sapphire
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(3.8, -2.5, -4.5),
         scale=2,
         color=Vec3(0.12, 0.35, 0.88),
@@ -1415,7 +1415,7 @@ def build_showcase_scene_v3():
     # Small crystal near left arch base - transparent
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(-1.8, -2.95, -5.0),
         scale=3,
         color=Vec3(0.18, 0.56, 1.0),
@@ -1427,7 +1427,7 @@ def build_showcase_scene_v3():
     # Small crystal near right arch base - metallic
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(1.8, -2.95, -5.0),
         scale=3,
         color=Vec3(0.10, 0.32, 0.82),
@@ -1439,7 +1439,7 @@ def build_showcase_scene_v3():
     # Small crystal near right side - transparent
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(5.7, -2.95, -6.0),
         scale=4.7,
         color=Vec3(0.18, 0.50, 0.98),
@@ -1451,7 +1451,7 @@ def build_showcase_scene_v3():
     # Small crystal near left side - metallic
     add_obj_to_scene(
         objects=objects,
-        filepath="models/crystal_1.obj",
+        filepath="../models/crystal_1.obj",
         position=Vec3(-5.7, -2.95, -6.0),
         scale=4.7,
         color=Vec3(0.10, 0.30, 0.76),
@@ -1467,7 +1467,7 @@ def build_showcase_scene_v3():
     # Left side tree arc
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(-12.0, -3.0, -9.5),
         scale=1.8,
         color=Vec3(0.22, 0.52, 0.24),
@@ -1477,7 +1477,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(-10.0, -3.0, -10.5),
         scale=1.9,
         color=Vec3(0.22, 0.54, 0.24),
@@ -1487,7 +1487,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(-8.0, -3.0, -11.5),
         scale=1.8,
         color=Vec3(0.24, 0.58, 0.26),
@@ -1497,7 +1497,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(-5.8, -3.0, -12.2),
         scale=1.7,
         color=Vec3(0.22, 0.56, 0.24),
@@ -1509,7 +1509,7 @@ def build_showcase_scene_v3():
     # Right side tree arc
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(12.0, -3.0, -9.5),
         scale=1.8,
         color=Vec3(0.22, 0.52, 0.24),
@@ -1519,7 +1519,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(10.0, -3.0, -10.5),
         scale=1.9,
         color=Vec3(0.22, 0.54, 0.24),
@@ -1529,7 +1529,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(8.0, -3.0, -11.5),
         scale=1.8,
         color=Vec3(0.24, 0.58, 0.26),
@@ -1539,7 +1539,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(5.8, -3.0, -12.2),
         scale=1.7,
         color=Vec3(0.22, 0.56, 0.24),
@@ -1550,7 +1550,7 @@ def build_showcase_scene_v3():
 
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(-3.8, -3.0, -12.8),
         scale=1.55,
         color=Vec3(0.22, 0.50, 0.23),
@@ -1560,7 +1560,7 @@ def build_showcase_scene_v3():
     )
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(3.8, -3.0, -12.8),
         scale=1.55,
         color=Vec3(0.22, 0.50, 0.23),
@@ -1571,7 +1571,7 @@ def build_showcase_scene_v3():
 
     add_obj_to_scene(
         objects=objects,
-        filepath="models/tree.obj",
+        filepath="../models/tree.obj",
         position=Vec3(0, -4.0, -13),
         scale=2.5,
         color=Vec3(0.22, 0.50, 0.23),
