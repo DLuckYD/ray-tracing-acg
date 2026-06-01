@@ -2,7 +2,7 @@ import os
 from PIL import Image
 
 import config
-from scenes import build_obj_test_scene
+from scenes import build_obj_test_scene, build_showcase_scene_v3
 from parallel import benchmark_render_parallel_tiles
 from triangle_data import build_triangle_data
 from triangle_bvh import build_triangle_bvh
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     config.triangle_data = build_triangle_data(objects)
     config.triangle_bvh_root = build_triangle_bvh(config.triangle_data)
 
-    # чистый triangle-only режим для этой сцены
+
     config.use_aabb = False
     config.use_bvh = False
     config.bvh_root = None
@@ -31,8 +31,8 @@ if __name__ == "__main__":
 
     times, average_time = benchmark_render_parallel_tiles(
         runs=10,
-        width=900,
-        height=600,
+        width=2200,
+        height=1300,
         objects=objects,
         background_color=background_color,
         light_position=light_position,

@@ -1261,4 +1261,339 @@ def build_obj_test_scene():
     )
 
     return objects, background_color, light_position
+
+def build_showcase_scene_v3():
+    light_position = Vec3(-7, 7, 4)
+    background_color = Vec3(0.16, 0.18, 0.22)
+
+    objects = []
+
+    # =========================================================
+    # CENTER COMPOSITION
+    # =========================================================
+
+    # Main pedestal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/Pedestal.obj",
+        position=Vec3(0.0, -3.0, -4.3),
+        scale=0.005,
+        color=Vec3(0.72, 0.72, 0.74),
+        reflection=0.08,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Main sword - dark mirror metal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/greatSword.obj",
+        position=Vec3(0.0, -0.3, -4.0),
+        scale=0.02,
+        color=Vec3(0.50, 0.53, 0.58),
+        reflection=0.82,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Main arch - mirror stone / polished reflective arch
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/arch.obj",
+        position=Vec3(0.0, 0.2, -7.0),
+        scale=5.0,
+        color=Vec3(0.78, 0.80, 0.84),
+        reflection=0.88,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # =========================================================
+    # SIDE OBJECTS NEAR THE ARCH
+    # =========================================================
+
+    # Left stone pedestal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/stone_pedestal.obj",
+        position=Vec3(-3.8, -3.0, -4.5),
+        scale=0.01,
+        color=Vec3(0.58, 0.58, 0.60),
+        reflection=0.06,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Right stone pedestal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/stone_pedestal.obj",
+        position=Vec3(3.8, -3.0, -4.5),
+        scale=0.01,
+        color=Vec3(0.58, 0.58, 0.60),
+        reflection=0.06,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Left urn - polished stone
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/NeoUrn.obj",
+        position=Vec3(-3.8, -3.0, -6.4),
+        scale=0.15,
+        color=Vec3(0.66, 0.60, 0.50),
+        reflection=0.18,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Right brazier - bronze / darker metal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/Brazier.obj",
+        position=Vec3(3.8, -3.0, -6.7),
+        scale=0.007,
+        color=Vec3(0.45, 0.24, 0.10),
+        reflection=0.35,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # =========================================================
+    # MAIN CRYSTAL GROUPS AROUND CENTER
+    # =========================================================
+
+    # Large cluster left of pedestal - transparent sapphire
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/Crystals.obj",
+        position=Vec3(-1.0, 0.0, -5.1),
+        scale=3,
+        color=Vec3(0.16, 0.45, 0.95),
+        reflection=0.10,
+        transparency=0.65,
+        ior=1.45
+    )
+
+    # Large cluster right of pedestal - metallic blue crystal
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/Crystals.obj",
+        position=Vec3(1.0, 0.0, -5.15),
+        scale=3,
+        color=Vec3(0.10, 0.28, 0.75),
+        reflection=0.42,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Front-left crystal - transparent sapphire
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(-3.8, -2.5, -4.5),
+        scale=2,
+        color=Vec3(0.18, 0.52, 1.0),
+        reflection=0.10,
+        transparency=0.60,
+        ior=1.42
+    )
+
+    # Front-right crystal - metallic sapphire
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(3.8, -2.5, -4.5),
+        scale=2,
+        color=Vec3(0.12, 0.35, 0.88),
+        reflection=0.45,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Small crystal near left arch base - transparent
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(-1.8, -2.95, -5.0),
+        scale=3,
+        color=Vec3(0.18, 0.56, 1.0),
+        reflection=0.08,
+        transparency=0.55,
+        ior=1.40
+    )
+
+    # Small crystal near right arch base - metallic
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(1.8, -2.95, -5.0),
+        scale=3,
+        color=Vec3(0.10, 0.32, 0.82),
+        reflection=0.40,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Small crystal near right side - transparent
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(5.7, -2.95, -6.0),
+        scale=4.7,
+        color=Vec3(0.18, 0.50, 0.98),
+        reflection=0.08,
+        transparency=0.58,
+        ior=1.40
+    )
+
+    # Small crystal near left side - metallic
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/crystal_1.obj",
+        position=Vec3(-5.7, -2.95, -6.0),
+        scale=4.7,
+        color=Vec3(0.10, 0.30, 0.76),
+        reflection=0.42,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # =========================================================
+    # TREE WALL IN A CURVED BACKGROUND
+    # =========================================================
+
+    # Left side tree arc
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(-12.0, -3.0, -9.5),
+        scale=1.8,
+        color=Vec3(0.22, 0.52, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(-10.0, -3.0, -10.5),
+        scale=1.9,
+        color=Vec3(0.22, 0.54, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(-8.0, -3.0, -11.5),
+        scale=1.8,
+        color=Vec3(0.24, 0.58, 0.26),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(-5.8, -3.0, -12.2),
+        scale=1.7,
+        color=Vec3(0.22, 0.56, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # Right side tree arc
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(12.0, -3.0, -9.5),
+        scale=1.8,
+        color=Vec3(0.22, 0.52, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(10.0, -3.0, -10.5),
+        scale=1.9,
+        color=Vec3(0.22, 0.54, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(8.0, -3.0, -11.5),
+        scale=1.8,
+        color=Vec3(0.24, 0.58, 0.26),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(5.8, -3.0, -12.2),
+        scale=1.7,
+        color=Vec3(0.22, 0.56, 0.24),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(-3.8, -3.0, -12.8),
+        scale=1.55,
+        color=Vec3(0.22, 0.50, 0.23),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(3.8, -3.0, -12.8),
+        scale=1.55,
+        color=Vec3(0.22, 0.50, 0.23),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="models/tree.obj",
+        position=Vec3(0, -4.0, -13),
+        scale=2.5,
+        color=Vec3(0.22, 0.50, 0.23),
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0
+    )
+
+    # =========================================================
+    # GROUND
+    # =========================================================
+
+    objects.append(
+        Plane(
+            Vec3(0, -3.0, 0),
+            Vec3(0, 1, 0),
+            Vec3(0.16, 0.40, 0.18),
+            reflection=0.12,
+            transparency=0.0,
+            ior=1.0
+        )
+    )
+
+    return objects, background_color, light_position
 #
