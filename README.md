@@ -176,7 +176,7 @@ The project includes benchmark scenes and timing measurements using `time.perf_c
 
 The benchmark results are documented separately in:
 
-[Benchmark Results](./BENCHMARK_HISTORY)
+[Benchmark Results](./BENCHMARK_RESULTS)
 
 In the current optimization stage, the renderer was improved step by step through:
 
