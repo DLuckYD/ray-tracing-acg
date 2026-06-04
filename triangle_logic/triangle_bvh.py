@@ -1,6 +1,14 @@
 import numpy as np
 from numba import njit
+import logic_scripts.config as config
 from triangle_logic.triangle_intersect import intersect_triangle_kernel
+
+try:
+    import rt_core
+    CPP_BACKEND_AVAILABLE = True
+except ImportError:
+    rt_core = None
+    CPP_BACKEND_AVAILABLE = False
 
 
 TRIANGLE_LEAF_SIZE = 8
@@ -743,7 +751,7 @@ def triangle_bvh_shadow_blocked_kernel(
     return 0
 
 
-def triangle_bvh_intersect(ray, triangle_bvh, triangle_data):
+def triangle_bvh_intersect_numba(ray, triangle_bvh, triangle_data):
     if triangle_bvh is None or triangle_bvh["root_index"] == -1:
         return None, None
 
@@ -782,7 +790,49 @@ def triangle_bvh_intersect(ray, triangle_bvh, triangle_data):
     return int(triangle_index), float(t)
 
 
-def triangle_bvh_shadow_blocked(ray, max_distance, triangle_bvh, triangle_data):
+def triangle_bvh_intersect_cpp(ray, triangle_bvh, triangle_data):
+    if not CPP_BACKEND_AVAILABLE:
+        return None, None
+
+    if triangle_bvh is None or triangle_bvh["root_index"] == -1:
+        return None, None
+
+    ox = ray.origin.x
+    oy = ray.origin.y
+    oz = ray.origin.z
+
+    dx = ray.direction.x
+    dy = ray.direction.y
+    dz = ray.direction.z
+
+    triangle_index, t = rt_core.triangle_bvh_intersect_cpp(
+        ox, oy, oz,
+        dx, dy, dz,
+        int(triangle_bvh["root_index"]),
+        triangle_bvh["triangle_indices"],
+        triangle_bvh["node_aabb_min_x"],
+        triangle_bvh["node_aabb_min_y"],
+        triangle_bvh["node_aabb_min_z"],
+        triangle_bvh["node_aabb_max_x"],
+        triangle_bvh["node_aabb_max_y"],
+        triangle_bvh["node_aabb_max_z"],
+        triangle_bvh["node_left"],
+        triangle_bvh["node_right"],
+        triangle_bvh["node_start"],
+        triangle_bvh["node_count"],
+        triangle_bvh["node_is_leaf"],
+        triangle_data["v0x"], triangle_data["v0y"], triangle_data["v0z"],
+        triangle_data["v1x"], triangle_data["v1y"], triangle_data["v1z"],
+        triangle_data["v2x"], triangle_data["v2y"], triangle_data["v2z"],
+    )
+
+    if triangle_index < 0 or t < 0.0:
+        return None, None
+
+    return int(triangle_index), float(t)
+
+
+def triangle_bvh_shadow_blocked_numba(ray, max_distance, triangle_bvh, triangle_data):
     if triangle_bvh is None or triangle_bvh["root_index"] == -1:
         return False
 
@@ -817,3 +867,53 @@ def triangle_bvh_shadow_blocked(ray, max_distance, triangle_bvh, triangle_data):
     )
 
     return result == 1
+
+
+def triangle_bvh_shadow_blocked_cpp(ray, max_distance, triangle_bvh, triangle_data):
+    if not CPP_BACKEND_AVAILABLE:
+        return False
+
+    if triangle_bvh is None or triangle_bvh["root_index"] == -1:
+        return False
+
+    ox = ray.origin.x
+    oy = ray.origin.y
+    oz = ray.origin.z
+
+    dx = ray.direction.x
+    dy = ray.direction.y
+    dz = ray.direction.z
+
+    return rt_core.triangle_bvh_shadow_blocked_cpp(
+        ox, oy, oz,
+        dx, dy, dz,
+        max_distance,
+        int(triangle_bvh["root_index"]),
+        triangle_bvh["triangle_indices"],
+        triangle_bvh["node_aabb_min_x"],
+        triangle_bvh["node_aabb_min_y"],
+        triangle_bvh["node_aabb_min_z"],
+        triangle_bvh["node_aabb_max_x"],
+        triangle_bvh["node_aabb_max_y"],
+        triangle_bvh["node_aabb_max_z"],
+        triangle_bvh["node_left"],
+        triangle_bvh["node_right"],
+        triangle_bvh["node_start"],
+        triangle_bvh["node_count"],
+        triangle_bvh["node_is_leaf"],
+        triangle_data["v0x"], triangle_data["v0y"], triangle_data["v0z"],
+        triangle_data["v1x"], triangle_data["v1y"], triangle_data["v1z"],
+        triangle_data["v2x"], triangle_data["v2y"], triangle_data["v2z"],
+    )
+
+
+def triangle_bvh_intersect(ray, triangle_bvh, triangle_data):
+    if config.backend_mode == "cpp" and CPP_BACKEND_AVAILABLE:
+        return triangle_bvh_intersect_cpp(ray, triangle_bvh, triangle_data)
+    return triangle_bvh_intersect_numba(ray, triangle_bvh, triangle_data)
+
+
+def triangle_bvh_shadow_blocked(ray, max_distance, triangle_bvh, triangle_data):
+    if config.backend_mode == "cpp" and CPP_BACKEND_AVAILABLE:
+        return triangle_bvh_shadow_blocked_cpp(ray, max_distance, triangle_bvh, triangle_data)
+    return triangle_bvh_shadow_blocked_numba(ray, max_distance, triangle_bvh, triangle_data)

@@ -1,6 +1,13 @@
 import numpy as np
 from numba import njit
 
+try:
+    import rt_core
+    CPP_BACKEND_AVAILABLE = True
+except ImportError:
+    rt_core = None
+    CPP_BACKEND_AVAILABLE = False
+
 
 @njit(cache=True, fastmath=True)
 def intersect_triangle_kernel(
@@ -66,6 +73,37 @@ def intersect_triangle_kernel(
         return t
 
     return -1.0
+
+
+def intersect_triangle_cpp_by_index(ray, triangle_data, triangle_index):
+    if not CPP_BACKEND_AVAILABLE:
+        return None
+
+    ox = ray.origin.x
+    oy = ray.origin.y
+    oz = ray.origin.z
+
+    dx = ray.direction.x
+    dy = ray.direction.y
+    dz = ray.direction.z
+
+    t = rt_core.intersect_triangle_kernel_cpp(
+        ox, oy, oz,
+        dx, dy, dz,
+        float(triangle_data["v0x"][triangle_index]),
+        float(triangle_data["v0y"][triangle_index]),
+        float(triangle_data["v0z"][triangle_index]),
+        float(triangle_data["v1x"][triangle_index]),
+        float(triangle_data["v1y"][triangle_index]),
+        float(triangle_data["v1z"][triangle_index]),
+        float(triangle_data["v2x"][triangle_index]),
+        float(triangle_data["v2y"][triangle_index]),
+        float(triangle_data["v2z"][triangle_index]),
+    )
+
+    if t < 0.0:
+        return None
+    return t
 
 
 def intersect_triangle_by_index(ray, triangle_data, triangle_index):

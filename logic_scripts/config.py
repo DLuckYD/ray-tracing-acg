@@ -17,3 +17,9 @@ scene_max_depth = 0
 use_triangle_backend = False
 triangle_data = None
 triangle_bvh_root = None
+
+# backend mode
+# possible values:
+# "numba" -> current Python + Numba pipeline
+# "cpp"   -> future C++ traversal pipeline
+backend_mode = "cpp"
