@@ -2,14 +2,11 @@
 
 #include <vector>
 
-std::vector<unsigned char> render_triangle_tile_cpp(
+std::vector<unsigned char> render_triangle_image_cpp(
     int width,
     int height,
-    int x_start,
-    int x_end,
-    int y_start,
-    int y_end,
     int max_depth,
+    int num_threads,
 
     double light_x,
     double light_y,

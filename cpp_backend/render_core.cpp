@@ -5,6 +5,10 @@
 #include <cmath>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace {
 
 struct Vec3d {
@@ -27,10 +31,6 @@ inline Vec3d sub(const Vec3d& a, const Vec3d& b) {
 
 inline Vec3d mul(const Vec3d& a, double s) {
     return {a.x * s, a.y * s, a.z * s};
-}
-
-inline Vec3d hadamard(const Vec3d& a, const Vec3d& b) {
-    return {a.x * b.x, a.y * b.y, a.z * b.z};
 }
 
 inline double dot(const Vec3d& a, const Vec3d& b) {
@@ -544,14 +544,11 @@ Vec3d trace_ray_triangle_only(
 
 } // namespace
 
-std::vector<unsigned char> render_triangle_tile_cpp(
+std::vector<unsigned char> render_triangle_image_cpp(
     int width,
     int height,
-    int x_start,
-    int x_end,
-    int y_start,
-    int y_end,
     int max_depth,
+    int num_threads,
 
     double light_x,
     double light_y,
@@ -599,21 +596,23 @@ std::vector<unsigned char> render_triangle_tile_cpp(
 
     int node_count_total
 ) {
-    int tile_width = x_end - x_start;
-    int tile_height = y_end - y_start;
-
-    std::vector<unsigned char> buffer(static_cast<size_t>(tile_width * tile_height * 3));
+    std::vector<unsigned char> buffer(static_cast<size_t>(width * height * 3));
 
     Vec3d camera_origin = {0.0, 0.0, 0.0};
     Vec3d light_position = {light_x, light_y, light_z};
     Vec3d background_color = {background_r, background_g, background_b};
 
-    size_t write_index = 0;
+#ifdef _OPENMP
+    if (num_threads > 0) {
+        omp_set_num_threads(num_threads);
+    }
+#endif
 
-    for (int y = y_start; y < y_end; ++y) {
+#pragma omp parallel for schedule(dynamic, 4) if(height > 32)
+    for (int y = 0; y < height; ++y) {
         double screen_y = screen_y_values[y];
 
-        for (int x = x_start; x < x_end; ++x) {
+        for (int x = 0; x < width; ++x) {
             double screen_x = screen_x_values[x];
 
             Vec3d pixel_pos = {screen_x, screen_y, -1.0};
@@ -665,11 +664,11 @@ std::vector<unsigned char> render_triangle_tile_cpp(
 
             color = clamp01(color);
 
+            size_t write_index = static_cast<size_t>((y * width + x) * 3);
+
             buffer[write_index]     = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.x * 255.0)));
             buffer[write_index + 1] = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.y * 255.0)));
             buffer[write_index + 2] = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.z * 255.0)));
-
-            write_index += 3;
         }
     }
 

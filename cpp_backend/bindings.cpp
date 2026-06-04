@@ -161,15 +161,12 @@ PYBIND11_MODULE(rt_core, m) {
     );
 
     m.def(
-        "render_triangle_tile_cpp",
+        "render_triangle_image_cpp",
         [](
             int width,
             int height,
-            int x_start,
-            int x_end,
-            int y_start,
-            int y_end,
             int max_depth,
+            int num_threads,
 
             double light_x,
             double light_y,
@@ -221,14 +218,11 @@ PYBIND11_MODULE(rt_core, m) {
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_x_values,
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_y_values
         ) {
-            std::vector<unsigned char> buffer = render_triangle_tile_cpp(
+            std::vector<unsigned char> buffer = render_triangle_image_cpp(
                 width,
                 height,
-                x_start,
-                x_end,
-                y_start,
-                y_end,
                 max_depth,
+                num_threads,
 
                 light_x,
                 light_y,
