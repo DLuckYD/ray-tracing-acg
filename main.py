@@ -64,7 +64,7 @@ if __name__ == "__main__":
         objects=objects,
         background_color=background_color,
         light_position=light_position,
-        depth=0,
+        depth=3,
         max_depth=max_depth,
         num_workers=num_workers,
         tile_size=tile_size
