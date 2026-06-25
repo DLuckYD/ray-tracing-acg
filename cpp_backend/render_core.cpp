@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #ifdef _OPENMP
@@ -17,9 +18,11 @@ struct Vec3d {
     double z;
 };
 
-inline Vec3d make_vec3(double x, double y, double z) {
-    return {x, y, z};
-}
+struct HitInfo {
+    bool hit;
+    int triangle_index;
+    double t;
+};
 
 inline Vec3d add(const Vec3d& a, const Vec3d& b) {
     return {a.x + b.x, a.y + b.y, a.z + b.z};
@@ -31,6 +34,14 @@ inline Vec3d sub(const Vec3d& a, const Vec3d& b) {
 
 inline Vec3d mul(const Vec3d& a, double s) {
     return {a.x * s, a.y * s, a.z * s};
+}
+
+inline Vec3d mul_vec(const Vec3d& a, const Vec3d& b) {
+    return {a.x * b.x, a.y * b.y, a.z * b.z};
+}
+
+inline Vec3d div_vec(const Vec3d& a, double s) {
+    return {a.x / s, a.y / s, a.z / s};
 }
 
 inline double dot(const Vec3d& a, const Vec3d& b) {
@@ -76,11 +87,40 @@ inline bool refract_dir(const Vec3d& direction, const Vec3d& normal, double n1, 
     return true;
 }
 
-struct HitInfo {
-    bool hit;
-    int triangle_index;
-    double t;
-};
+inline uint64_t xorshift64(uint64_t& state) {
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    return state;
+}
+
+inline double random_double_01(uint64_t& state) {
+    uint64_t v = xorshift64(state);
+    return (v >> 11) * (1.0 / 9007199254740992.0);
+}
+
+inline Vec3d cross(const Vec3d& a, const Vec3d& b) {
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+inline Vec3d random_unit_vector(uint64_t& rng_state) {
+    double z = 2.0 * random_double_01(rng_state) - 1.0;
+    double a = 2.0 * 3.14159265358979323846 * random_double_01(rng_state);
+    double r = std::sqrt(std::max(0.0, 1.0 - z * z));
+    return {r * std::cos(a), r * std::sin(a), z};
+}
+
+inline Vec3d random_hemisphere_direction(const Vec3d& normal, uint64_t& rng_state) {
+    Vec3d random_dir = random_unit_vector(rng_state);
+    if (dot(random_dir, normal) < 0.0) {
+        random_dir = mul(random_dir, -1.0);
+    }
+    return normalize(random_dir);
+}
 
 inline HitInfo find_closest_triangle_hit(
     const Vec3d& origin,
@@ -542,6 +582,189 @@ Vec3d trace_ray_triangle_only(
     );
 }
 
+Vec3d trace_path_ray_triangle_only(
+    const Vec3d& origin,
+    const Vec3d& direction,
+    int depth,
+    int max_bounces,
+    uint64_t& rng_state,
+
+    const Vec3d& light_position,
+    const Vec3d& background_color,
+
+    int root_index,
+
+    const int* flat_triangle_indices,
+
+    const double* node_aabb_min_x,
+    const double* node_aabb_min_y,
+    const double* node_aabb_min_z,
+    const double* node_aabb_max_x,
+    const double* node_aabb_max_y,
+    const double* node_aabb_max_z,
+
+    const int* node_left,
+    const int* node_right,
+    const int* node_start,
+    const int* node_count,
+    const unsigned char* node_is_leaf,
+
+    const double* v0x, const double* v0y, const double* v0z,
+    const double* v1x, const double* v1y, const double* v1z,
+    const double* v2x, const double* v2y, const double* v2z,
+
+    const double* normal_x,
+    const double* normal_y,
+    const double* normal_z,
+
+    const double* color_r,
+    const double* color_g,
+    const double* color_b,
+
+    int node_count_total
+) {
+    if (depth >= max_bounces) {
+        return {0.0, 0.0, 0.0};
+    }
+
+    HitInfo hit = find_closest_triangle_hit(
+        origin, direction,
+        root_index,
+
+        flat_triangle_indices,
+
+        node_aabb_min_x,
+        node_aabb_min_y,
+        node_aabb_min_z,
+        node_aabb_max_x,
+        node_aabb_max_y,
+        node_aabb_max_z,
+
+        node_left,
+        node_right,
+        node_start,
+        node_count,
+        node_is_leaf,
+
+        v0x, v0y, v0z,
+        v1x, v1y, v1z,
+        v2x, v2y, v2z,
+
+        node_count_total
+    );
+
+    if (!hit.hit) {
+        return background_color;
+    }
+
+    const int tri = hit.triangle_index;
+    const double t = hit.t;
+
+    Vec3d hit_point = add(origin, mul(direction, t));
+    Vec3d normal = normalize({normal_x[tri], normal_y[tri], normal_z[tri]});
+    Vec3d albedo = {color_r[tri], color_g[tri], color_b[tri]};
+
+    const double epsilon = 0.001;
+
+    // Small direct-light term from existing point light
+    Vec3d to_light = sub(light_position, hit_point);
+    double distance_to_light = length(to_light);
+
+    Vec3d direct_color = {0.0, 0.0, 0.0};
+
+    if (distance_to_light > 0.0) {
+        Vec3d light_dir = mul(to_light, 1.0 / distance_to_light);
+        double n_dot_l = dot(normal, light_dir);
+
+        if (n_dot_l > 0.0) {
+            Vec3d shadow_origin = add(hit_point, mul(normal, epsilon));
+            bool blocked = shadow_blocked(
+                shadow_origin,
+                light_dir,
+                distance_to_light,
+                root_index,
+
+                flat_triangle_indices,
+
+                node_aabb_min_x,
+                node_aabb_min_y,
+                node_aabb_min_z,
+                node_aabb_max_x,
+                node_aabb_max_y,
+                node_aabb_max_z,
+
+                node_left,
+                node_right,
+                node_start,
+                node_count,
+                node_is_leaf,
+
+                v0x, v0y, v0z,
+                v1x, v1y, v1z,
+                v2x, v2y, v2z,
+
+                node_count_total
+            );
+
+            if (!blocked) {
+                double attenuation = 1.0 / (1.0 + 0.02 * distance_to_light * distance_to_light);
+                direct_color = mul(albedo, n_dot_l * attenuation);
+            }
+        }
+    }
+
+    Vec3d bounce_dir = random_hemisphere_direction(normal, rng_state);
+    Vec3d bounce_origin = add(hit_point, mul(normal, epsilon));
+
+    Vec3d indirect = trace_path_ray_triangle_only(
+        bounce_origin,
+        bounce_dir,
+        depth + 1,
+        max_bounces,
+        rng_state,
+
+        light_position,
+        background_color,
+
+        root_index,
+
+        flat_triangle_indices,
+
+        node_aabb_min_x,
+        node_aabb_min_y,
+        node_aabb_min_z,
+        node_aabb_max_x,
+        node_aabb_max_y,
+        node_aabb_max_z,
+
+        node_left,
+        node_right,
+        node_start,
+        node_count,
+        node_is_leaf,
+
+        v0x, v0y, v0z,
+        v1x, v1y, v1z,
+        v2x, v2y, v2z,
+
+        normal_x,
+        normal_y,
+        normal_z,
+
+        color_r,
+        color_g,
+        color_b,
+
+        node_count_total
+    );
+
+    double cosine = std::max(0.0, dot(normal, bounce_dir));
+    Vec3d indirect_color = mul_vec(albedo, mul(indirect, cosine));
+
+    // Blend direct + indirect to keep first version visible and stable
+    return add(mul(direct_color, 0.7), mul(indirect_color, 0.8));
+}
+
 } // namespace
 
 std::vector<unsigned char> render_triangle_image_cpp(
@@ -663,6 +886,161 @@ std::vector<unsigned char> render_triangle_image_cpp(
             );
 
             color = clamp01(color);
+
+            size_t write_index = static_cast<size_t>((y * width + x) * 3);
+
+            buffer[write_index]     = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.x * 255.0)));
+            buffer[write_index + 1] = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.y * 255.0)));
+            buffer[write_index + 2] = static_cast<unsigned char>(std::max(0.0, std::min(255.0, color.z * 255.0)));
+        }
+    }
+
+    return buffer;
+}
+
+std::vector<unsigned char> render_triangle_path_traced_image_cpp(
+    int width,
+    int height,
+    int samples_per_pixel,
+    int max_bounces,
+    int num_threads,
+
+    double light_x,
+    double light_y,
+    double light_z,
+
+    double background_r,
+    double background_g,
+    double background_b,
+
+    int root_index,
+
+    const int* flat_triangle_indices,
+
+    const double* node_aabb_min_x,
+    const double* node_aabb_min_y,
+    const double* node_aabb_min_z,
+    const double* node_aabb_max_x,
+    const double* node_aabb_max_y,
+    const double* node_aabb_max_z,
+
+    const int* node_left,
+    const int* node_right,
+    const int* node_start,
+    const int* node_count,
+    const unsigned char* node_is_leaf,
+
+    const double* v0x, const double* v0y, const double* v0z,
+    const double* v1x, const double* v1y, const double* v1z,
+    const double* v2x, const double* v2y, const double* v2z,
+
+    const double* normal_x,
+    const double* normal_y,
+    const double* normal_z,
+
+    const double* color_r,
+    const double* color_g,
+    const double* color_b,
+
+    const double* reflection,
+    const double* transparency,
+    const double* ior,
+
+    const double* screen_x_values,
+    const double* screen_y_values,
+
+    int node_count_total
+) {
+    (void)reflection;
+    (void)transparency;
+    (void)ior;
+
+    std::vector<unsigned char> buffer(static_cast<size_t>(width * height * 3));
+
+    Vec3d camera_origin = {0.0, 0.0, 0.0};
+    Vec3d light_position = {light_x, light_y, light_z};
+    Vec3d background_color = {background_r, background_g, background_b};
+
+#ifdef _OPENMP
+    if (num_threads > 0) {
+        omp_set_num_threads(num_threads);
+    }
+#endif
+
+#pragma omp parallel for schedule(dynamic, 2) if(height > 16)
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint64_t rng_state = 1469598103934665603ull
+                                 ^ static_cast<uint64_t>(x + 1) * 1099511628211ull
+                                 ^ static_cast<uint64_t>(y + 1) * 1469598103934665603ull;
+
+            Vec3d accumulated = {0.0, 0.0, 0.0};
+
+            for (int s = 0; s < samples_per_pixel; ++s) {
+                double jitter_x = random_double_01(rng_state) - 0.5;
+                double jitter_y = random_double_01(rng_state) - 0.5;
+
+                int sample_x_index = x;
+                int sample_y_index = y;
+
+                double screen_x = screen_x_values[sample_x_index] + jitter_x * (2.0 / static_cast<double>(width));
+                double screen_y = screen_y_values[sample_y_index] - jitter_y * (2.0 / static_cast<double>(height));
+
+                Vec3d pixel_pos = {screen_x, screen_y, -1.0};
+                Vec3d direction = normalize(sub(pixel_pos, camera_origin));
+
+                Vec3d sample_color = trace_path_ray_triangle_only(
+                    camera_origin,
+                    direction,
+                    0,
+                    max_bounces,
+                    rng_state,
+
+                    light_position,
+                    background_color,
+
+                    root_index,
+
+                    flat_triangle_indices,
+
+                    node_aabb_min_x,
+                    node_aabb_min_y,
+                    node_aabb_min_z,
+                    node_aabb_max_x,
+                    node_aabb_max_y,
+                    node_aabb_max_z,
+
+                    node_left,
+                    node_right,
+                    node_start,
+                    node_count,
+                    node_is_leaf,
+
+                    v0x, v0y, v0z,
+                    v1x, v1y, v1z,
+                    v2x, v2y, v2z,
+
+                    normal_x,
+                    normal_y,
+                    normal_z,
+
+                    color_r,
+                    color_g,
+                    color_b,
+
+                    node_count_total
+                );
+
+                accumulated = add(accumulated, sample_color);
+            }
+
+            Vec3d color = div_vec(accumulated, static_cast<double>(samples_per_pixel));
+            color = clamp01(color);
+
+            // simple gamma correction
+            color.x = std::sqrt(color.x);
+            color.y = std::sqrt(color.y);
+            color.z = std::sqrt(color.z);
 
             size_t write_index = static_cast<size_t>((y * width + x) * 3);
 

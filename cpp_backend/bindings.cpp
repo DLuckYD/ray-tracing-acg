@@ -274,4 +274,121 @@ PYBIND11_MODULE(rt_core, m) {
             return py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         }
     );
+
+    m.def(
+        "render_triangle_path_traced_image_cpp",
+        [](
+            int width,
+            int height,
+            int samples_per_pixel,
+            int max_bounces,
+            int num_threads,
+
+            double light_x,
+            double light_y,
+            double light_z,
+
+            double background_r,
+            double background_g,
+            double background_b,
+
+            int root_index,
+
+            py::array_t<int, py::array::c_style | py::array::forcecast> flat_triangle_indices,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_min_x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_min_y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_min_z,
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_max_x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_max_y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> node_aabb_max_z,
+
+            py::array_t<int, py::array::c_style | py::array::forcecast> node_left,
+            py::array_t<int, py::array::c_style | py::array::forcecast> node_right,
+            py::array_t<int, py::array::c_style | py::array::forcecast> node_start,
+            py::array_t<int, py::array::c_style | py::array::forcecast> node_count,
+            py::array_t<unsigned char, py::array::c_style | py::array::forcecast> node_is_leaf,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> v0x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v0y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v0z,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v1x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v1y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v1z,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v2x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v2y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> v2z,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> normal_x,
+            py::array_t<double, py::array::c_style | py::array::forcecast> normal_y,
+            py::array_t<double, py::array::c_style | py::array::forcecast> normal_z,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> color_r,
+            py::array_t<double, py::array::c_style | py::array::forcecast> color_g,
+            py::array_t<double, py::array::c_style | py::array::forcecast> color_b,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> reflection,
+            py::array_t<double, py::array::c_style | py::array::forcecast> transparency,
+            py::array_t<double, py::array::c_style | py::array::forcecast> ior,
+
+            py::array_t<double, py::array::c_style | py::array::forcecast> screen_x_values,
+            py::array_t<double, py::array::c_style | py::array::forcecast> screen_y_values
+        ) {
+            std::vector<unsigned char> buffer = render_triangle_path_traced_image_cpp(
+                width,
+                height,
+                samples_per_pixel,
+                max_bounces,
+                num_threads,
+
+                light_x,
+                light_y,
+                light_z,
+
+                background_r,
+                background_g,
+                background_b,
+
+                root_index,
+
+                flat_triangle_indices.data(),
+
+                node_aabb_min_x.data(),
+                node_aabb_min_y.data(),
+                node_aabb_min_z.data(),
+                node_aabb_max_x.data(),
+                node_aabb_max_y.data(),
+                node_aabb_max_z.data(),
+
+                node_left.data(),
+                node_right.data(),
+                node_start.data(),
+                node_count.data(),
+                node_is_leaf.data(),
+
+                v0x.data(), v0y.data(), v0z.data(),
+                v1x.data(), v1y.data(), v1z.data(),
+                v2x.data(), v2y.data(), v2z.data(),
+
+                normal_x.data(),
+                normal_y.data(),
+                normal_z.data(),
+
+                color_r.data(),
+                color_g.data(),
+                color_b.data(),
+
+                reflection.data(),
+                transparency.data(),
+                ior.data(),
+
+                screen_x_values.data(),
+                screen_y_values.data(),
+
+                static_cast<int>(node_left.size())
+            );
+
+            return py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        }
+    );
 }

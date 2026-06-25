@@ -3,7 +3,7 @@ import time
 from PIL import Image
 
 import logic_scripts.config
-from logic_scripts.scenes import build_showcase_scene_v3, build_obj_test_scene, build_realistic_benchmark_scene
+from logic_scripts.scenes import build_obj_test_scene
 from logic_scripts.parallel import benchmark_render_parallel_tiles
 from logic_scripts.benchmark_logger import reset_logs_dir, write_run_log, write_summary_log
 from triangle_logic.triangle_data import build_triangle_data
@@ -20,6 +20,7 @@ if __name__ == "__main__":
 
     scene_name = "build_obj_test_scene"
     config.backend_mode = "cpp"
+    config.render_mode = "pathtrace"   # "raytrace" or "pathtrace"
 
     t_scene = time.perf_counter()
     objects, background_color, light_position = build_obj_test_scene()
@@ -41,18 +42,27 @@ if __name__ == "__main__":
     config.use_bvh = True
     config.bvh_root = None
     config.non_bvh_objects = []
+
+    # Path tracing parameters
+    config.samples_per_pixel = 4
+    config.max_bounces = 2
+
 ####################################################################################
     num_workers = 10
-    runs = 11
-    width = 1920
-    height = 1080
+    runs = 3
+    width = 1280
+    height = 720
     max_depth = 0
     tile_size = 128
 ####################################################################################
+
     build_stage_timings = {
         "scene_build": scene_build_time,
         "triangle_data_build": triangle_data_build_time,
         "triangle_bvh_build": triangle_bvh_build_time,
+        "samples_per_pixel": config.samples_per_pixel,
+        "max_bounces": config.max_bounces,
+        "render_mode": config.render_mode,
     }
 
     reset_logs_dir()

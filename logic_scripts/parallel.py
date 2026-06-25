@@ -82,67 +82,128 @@ def render_full_image_python(width, height, objects, background_color, light_pos
 def render_parallel_tiles(width, height, objects, background_color, light_position, depth, max_depth, num_workers, tile_size=16):
     stage_timings = {}
 
+    render_mode = getattr(config, "render_mode", "raytrace")
+    samples_per_pixel = getattr(config, "samples_per_pixel", 1)
+    max_bounces = getattr(config, "max_bounces", 2)
+
     t0 = time.perf_counter()
     screen_x_values, screen_y_values = build_screen_coordinate_arrays(width, height)
     stage_timings["build_screen_coordinate_arrays"] = time.perf_counter() - t0
 
     if config.backend_mode == "cpp" and config.use_triangle_backend and CPP_BACKEND_AVAILABLE:
-        t1 = time.perf_counter()
-
         triangle_data = config.triangle_data
         triangle_bvh = config.triangle_bvh_root
 
-        image_bytes = rt_core.render_triangle_image_cpp(
-            width,
-            height,
-            max_depth,
-            num_workers,
+        if render_mode == "pathtrace":
+            t1 = time.perf_counter()
 
-            light_position.x,
-            light_position.y,
-            light_position.z,
+            image_bytes = rt_core.render_triangle_path_traced_image_cpp(
+                width,
+                height,
+                samples_per_pixel,
+                max_bounces,
+                num_workers,
 
-            background_color.x,
-            background_color.y,
-            background_color.z,
+                light_position.x,
+                light_position.y,
+                light_position.z,
 
-            int(triangle_bvh["root_index"]),
-            triangle_bvh["triangle_indices"],
+                background_color.x,
+                background_color.y,
+                background_color.z,
 
-            triangle_bvh["node_aabb_min_x"],
-            triangle_bvh["node_aabb_min_y"],
-            triangle_bvh["node_aabb_min_z"],
-            triangle_bvh["node_aabb_max_x"],
-            triangle_bvh["node_aabb_max_y"],
-            triangle_bvh["node_aabb_max_z"],
+                int(triangle_bvh["root_index"]),
+                triangle_bvh["triangle_indices"],
 
-            triangle_bvh["node_left"],
-            triangle_bvh["node_right"],
-            triangle_bvh["node_start"],
-            triangle_bvh["node_count"],
-            triangle_bvh["node_is_leaf"],
+                triangle_bvh["node_aabb_min_x"],
+                triangle_bvh["node_aabb_min_y"],
+                triangle_bvh["node_aabb_min_z"],
+                triangle_bvh["node_aabb_max_x"],
+                triangle_bvh["node_aabb_max_y"],
+                triangle_bvh["node_aabb_max_z"],
 
-            triangle_data["v0x"], triangle_data["v0y"], triangle_data["v0z"],
-            triangle_data["v1x"], triangle_data["v1y"], triangle_data["v1z"],
-            triangle_data["v2x"], triangle_data["v2y"], triangle_data["v2z"],
+                triangle_bvh["node_left"],
+                triangle_bvh["node_right"],
+                triangle_bvh["node_start"],
+                triangle_bvh["node_count"],
+                triangle_bvh["node_is_leaf"],
 
-            triangle_data["normal_x"],
-            triangle_data["normal_y"],
-            triangle_data["normal_z"],
+                triangle_data["v0x"], triangle_data["v0y"], triangle_data["v0z"],
+                triangle_data["v1x"], triangle_data["v1y"], triangle_data["v1z"],
+                triangle_data["v2x"], triangle_data["v2y"], triangle_data["v2z"],
 
-            triangle_data["color_r"],
-            triangle_data["color_g"],
-            triangle_data["color_b"],
+                triangle_data["normal_x"],
+                triangle_data["normal_y"],
+                triangle_data["normal_z"],
 
-            triangle_data["reflection"],
-            triangle_data["transparency"],
-            triangle_data["ior"],
+                triangle_data["color_r"],
+                triangle_data["color_g"],
+                triangle_data["color_b"],
 
-            screen_x_values,
-            screen_y_values,
-        )
+                triangle_data["reflection"],
+                triangle_data["transparency"],
+                triangle_data["ior"],
 
-        stage_timings["cpp_full_image_render"] = time.perf_counter() - t1
+                screen_x_values,
+                screen_y_values,
+            )
+
+            stage_timings["cpp_path_traced_full_image_render"] = time.perf_counter() - t1
+
+        else:
+            t1 = time.perf_counter()
+
+            image_bytes = rt_core.render_triangle_image_cpp(
+                width,
+                height,
+                max_depth,
+                num_workers,
+
+                light_position.x,
+                light_position.y,
+                light_position.z,
+
+                background_color.x,
+                background_color.y,
+                background_color.z,
+
+                int(triangle_bvh["root_index"]),
+                triangle_bvh["triangle_indices"],
+
+                triangle_bvh["node_aabb_min_x"],
+                triangle_bvh["node_aabb_min_y"],
+                triangle_bvh["node_aabb_min_z"],
+                triangle_bvh["node_aabb_max_x"],
+                triangle_bvh["node_aabb_max_y"],
+                triangle_bvh["node_aabb_max_z"],
+
+                triangle_bvh["node_left"],
+                triangle_bvh["node_right"],
+                triangle_bvh["node_start"],
+                triangle_bvh["node_count"],
+                triangle_bvh["node_is_leaf"],
+
+                triangle_data["v0x"], triangle_data["v0y"], triangle_data["v0z"],
+                triangle_data["v1x"], triangle_data["v1y"], triangle_data["v1z"],
+                triangle_data["v2x"], triangle_data["v2y"], triangle_data["v2z"],
+
+                triangle_data["normal_x"],
+                triangle_data["normal_y"],
+                triangle_data["normal_z"],
+
+                triangle_data["color_r"],
+                triangle_data["color_g"],
+                triangle_data["color_b"],
+
+                triangle_data["reflection"],
+                triangle_data["transparency"],
+                triangle_data["ior"],
+
+                screen_x_values,
+                screen_y_values,
+            )
+
+            stage_timings["cpp_full_image_render"] = time.perf_counter() - t1
 
         t2 = time.perf_counter()
         image = Image.frombytes("RGB", (width, height), image_bytes)
@@ -152,14 +213,13 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
         image.save("render.png")
         stage_timings["image_save"] = time.perf_counter() - t3
 
-        stage_timings["render_parallel_tiles_total"] = (
-            stage_timings["build_screen_coordinate_arrays"]
-            + stage_timings["cpp_full_image_render"]
-            + stage_timings["image_from_bytes"]
-            + stage_timings["image_save"]
-        )
+        stage_timings["render_parallel_tiles_total"] = sum(stage_timings.values())
 
-        print("Full C++ image render finished: render.png")
+        if render_mode == "pathtrace":
+            print("Full C++ path traced image render finished: render.png")
+        else:
+            print("Full C++ ray traced image render finished: render.png")
+
         return image, stage_timings
 
     # fallback path
