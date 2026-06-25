@@ -12,6 +12,9 @@
 
 namespace {
 
+constexpr double PI = 3.14159265358979323846;
+constexpr double EPSILON = 0.001;
+
 struct Vec3d {
     double x;
     double y;
@@ -46,6 +49,14 @@ inline Vec3d div_vec(const Vec3d& a, double s) {
 
 inline double dot(const Vec3d& a, const Vec3d& b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline Vec3d cross(const Vec3d& a, const Vec3d& b) {
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
 }
 
 inline double length(const Vec3d& v) {
@@ -99,27 +110,62 @@ inline double random_double_01(uint64_t& state) {
     return (v >> 11) * (1.0 / 9007199254740992.0);
 }
 
-inline Vec3d cross(const Vec3d& a, const Vec3d& b) {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
+inline Vec3d mix(const Vec3d& a, const Vec3d& b, double t) {
+    return add(mul(a, 1.0 - t), mul(b, t));
+}
+
+inline Vec3d build_sky_color(const Vec3d& direction, const Vec3d& background_color) {
+    double t = 0.5 * (direction.y + 1.0);
+
+    Vec3d ground_tint = {
+        background_color.x * 0.55 + 0.10,
+        background_color.y * 0.55 + 0.11,
+        background_color.z * 0.55 + 0.13
     };
-}
 
-inline Vec3d random_unit_vector(uint64_t& rng_state) {
-    double z = 2.0 * random_double_01(rng_state) - 1.0;
-    double a = 2.0 * 3.14159265358979323846 * random_double_01(rng_state);
-    double r = std::sqrt(std::max(0.0, 1.0 - z * z));
-    return {r * std::cos(a), r * std::sin(a), z};
-}
+    Vec3d horizon = {
+        background_color.x * 0.75 + 0.18,
+        background_color.y * 0.75 + 0.20,
+        background_color.z * 0.75 + 0.24
+    };
 
-inline Vec3d random_hemisphere_direction(const Vec3d& normal, uint64_t& rng_state) {
-    Vec3d random_dir = random_unit_vector(rng_state);
-    if (dot(random_dir, normal) < 0.0) {
-        random_dir = mul(random_dir, -1.0);
+    Vec3d zenith = {
+        background_color.x * 0.45 + 0.36,
+        background_color.y * 0.45 + 0.42,
+        background_color.z * 0.45 + 0.55
+    };
+
+    if (direction.y < 0.0) {
+        double g = std::min(1.0, -direction.y);
+        return mix(horizon, ground_tint, g * 0.65);
     }
-    return normalize(random_dir);
+
+    return mix(horizon, zenith, t);
+}
+
+inline Vec3d cosine_weighted_hemisphere_direction(const Vec3d& normal, uint64_t& rng_state) {
+    double r1 = random_double_01(rng_state);
+    double r2 = random_double_01(rng_state);
+
+    double phi = 2.0 * PI * r1;
+    double r = std::sqrt(r2);
+
+    double x = r * std::cos(phi);
+    double y = r * std::sin(phi);
+    double z = std::sqrt(std::max(0.0, 1.0 - r2));
+
+    Vec3d n = normalize(normal);
+    Vec3d helper = (std::fabs(n.x) > 0.1) ? Vec3d{0.0, 1.0, 0.0} : Vec3d{1.0, 0.0, 0.0};
+
+    Vec3d tangent = normalize(cross(helper, n));
+    Vec3d bitangent = cross(n, tangent);
+
+    Vec3d world_dir = add(
+        add(mul(tangent, x), mul(bitangent, y)),
+        mul(n, z)
+    );
+
+    return normalize(world_dir);
 }
 
 inline HitInfo find_closest_triangle_hit(
@@ -339,11 +385,10 @@ Vec3d trace_ray_triangle_only(
         direction_light = mul(to_light, 1.0 / distance_to_light);
     }
 
-    const double epsilon = 0.001;
     Vec3d shadow_origin = {
-        hit_point.x + normal.x * epsilon,
-        hit_point.y + normal.y * epsilon,
-        hit_point.z + normal.z * epsilon
+        hit_point.x + normal.x * EPSILON,
+        hit_point.y + normal.y * EPSILON,
+        hit_point.z + normal.z * EPSILON
     };
 
     bool blocked = shadow_blocked(
@@ -397,9 +442,9 @@ Vec3d trace_ray_triangle_only(
     if (surface_transparency <= 0.0) {
         Vec3d reflected_direction = reflect_dir(direction, normal);
         Vec3d reflect_origin = {
-            hit_point.x + normal.x * epsilon,
-            hit_point.y + normal.y * epsilon,
-            hit_point.z + normal.z * epsilon
+            hit_point.x + normal.x * EPSILON,
+            hit_point.y + normal.y * EPSILON,
+            hit_point.z + normal.z * EPSILON
         };
 
         Vec3d reflected_color = trace_ray_triangle_only(
@@ -454,9 +499,9 @@ Vec3d trace_ray_triangle_only(
 
     Vec3d reflected_direction = reflect_dir(direction, normal);
     Vec3d reflect_origin = {
-        hit_point.x + normal.x * epsilon,
-        hit_point.y + normal.y * epsilon,
-        hit_point.z + normal.z * epsilon
+        hit_point.x + normal.x * EPSILON,
+        hit_point.y + normal.y * EPSILON,
+        hit_point.z + normal.z * EPSILON
     };
 
     Vec3d reflected_color = trace_ray_triangle_only(
@@ -523,9 +568,9 @@ Vec3d trace_ray_triangle_only(
 
     if (refracted_ok) {
         Vec3d refract_origin = {
-            hit_point.x - refract_normal.x * epsilon,
-            hit_point.y - refract_normal.y * epsilon,
-            hit_point.z - refract_normal.z * epsilon
+            hit_point.x - refract_normal.x * EPSILON,
+            hit_point.y - refract_normal.y * EPSILON,
+            hit_point.z - refract_normal.z * EPSILON
         };
 
         refracted_color = trace_ray_triangle_only(
@@ -654,7 +699,7 @@ Vec3d trace_path_ray_triangle_only(
     );
 
     if (!hit.hit) {
-        return background_color;
+        return build_sky_color(direction, background_color);
     }
 
     const int tri = hit.triangle_index;
@@ -662,22 +707,29 @@ Vec3d trace_path_ray_triangle_only(
 
     Vec3d hit_point = add(origin, mul(direction, t));
     Vec3d normal = normalize({normal_x[tri], normal_y[tri], normal_z[tri]});
-    Vec3d albedo = {color_r[tri], color_g[tri], color_b[tri]};
+    Vec3d base_albedo = {color_r[tri], color_g[tri], color_b[tri]};
 
-    const double epsilon = 0.001;
+    if (dot(normal, direction) > 0.0) {
+        normal = mul(normal, -1.0);
+    }
 
-    // Small direct-light term from existing point light
-    Vec3d to_light = sub(light_position, hit_point);
-    double distance_to_light = length(to_light);
+    Vec3d albedo = {
+        std::max(0.0, std::min(1.0, base_albedo.x * 0.82)),
+        std::max(0.0, std::min(1.0, base_albedo.y * 0.82)),
+        std::max(0.0, std::min(1.0, base_albedo.z * 0.82))
+    };
 
     Vec3d direct_color = {0.0, 0.0, 0.0};
 
+    Vec3d to_light = sub(light_position, hit_point);
+    double distance_to_light = length(to_light);
+
     if (distance_to_light > 0.0) {
         Vec3d light_dir = mul(to_light, 1.0 / distance_to_light);
-        double n_dot_l = dot(normal, light_dir);
+        double n_dot_l = std::max(0.0, dot(normal, light_dir));
 
         if (n_dot_l > 0.0) {
-            Vec3d shadow_origin = add(hit_point, mul(normal, epsilon));
+            Vec3d shadow_origin = add(hit_point, mul(normal, EPSILON));
             bool blocked = shadow_blocked(
                 shadow_origin,
                 light_dir,
@@ -707,14 +759,14 @@ Vec3d trace_path_ray_triangle_only(
             );
 
             if (!blocked) {
-                double attenuation = 1.0 / (1.0 + 0.02 * distance_to_light * distance_to_light);
+                double attenuation = 1.35 / (1.0 + 0.0045 * distance_to_light * distance_to_light);
                 direct_color = mul(albedo, n_dot_l * attenuation);
             }
         }
     }
 
-    Vec3d bounce_dir = random_hemisphere_direction(normal, rng_state);
-    Vec3d bounce_origin = add(hit_point, mul(normal, epsilon));
+    Vec3d bounce_dir = cosine_weighted_hemisphere_direction(normal, rng_state);
+    Vec3d bounce_origin = add(hit_point, mul(normal, EPSILON));
 
     Vec3d indirect = trace_path_ray_triangle_only(
         bounce_origin,
@@ -758,11 +810,25 @@ Vec3d trace_path_ray_triangle_only(
         node_count_total
     );
 
-    double cosine = std::max(0.0, dot(normal, bounce_dir));
-    Vec3d indirect_color = mul_vec(albedo, mul(indirect, cosine));
+    Vec3d sky_tint = {
+        0.92,
+        0.95,
+        1.0
+    };
 
-    // Blend direct + indirect to keep first version visible and stable
-    return add(mul(direct_color, 0.7), mul(indirect_color, 0.8));
+    Vec3d indirect_color = mul_vec(albedo, mul_vec(indirect, sky_tint));
+
+    if (depth >= 2) {
+        double p = std::max({albedo.x, albedo.y, albedo.z, 0.30});
+        if (random_double_01(rng_state) > p) {
+            return direct_color;
+        }
+        indirect_color = div_vec(indirect_color, p);
+    }
+
+    Vec3d ambient_lift = mul(albedo, 0.025);
+    Vec3d result = add(add(mul(direct_color, 0.72), mul(indirect_color, 0.82)), ambient_lift);
+    return result;
 }
 
 } // namespace
@@ -980,11 +1046,8 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
                 double jitter_x = random_double_01(rng_state) - 0.5;
                 double jitter_y = random_double_01(rng_state) - 0.5;
 
-                int sample_x_index = x;
-                int sample_y_index = y;
-
-                double screen_x = screen_x_values[sample_x_index] + jitter_x * (2.0 / static_cast<double>(width));
-                double screen_y = screen_y_values[sample_y_index] - jitter_y * (2.0 / static_cast<double>(height));
+                double screen_x = screen_x_values[x] + jitter_x * (2.0 / static_cast<double>(width));
+                double screen_y = screen_y_values[y] - jitter_y * (2.0 / static_cast<double>(height));
 
                 Vec3d pixel_pos = {screen_x, screen_y, -1.0};
                 Vec3d direction = normalize(sub(pixel_pos, camera_origin));
@@ -1037,7 +1100,6 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
             Vec3d color = div_vec(accumulated, static_cast<double>(samples_per_pixel));
             color = clamp01(color);
 
-            // simple gamma correction
             color.x = std::sqrt(color.x);
             color.y = std::sqrt(color.y);
             color.z = std::sqrt(color.z);

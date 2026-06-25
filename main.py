@@ -44,7 +44,7 @@ if __name__ == "__main__":
     config.non_bvh_objects = []
 
     # Path tracing parameters
-    config.samples_per_pixel = 4
+    config.samples_per_pixel = 10
     config.max_bounces = 2
 
 ####################################################################################
