@@ -61,6 +61,8 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
     int samples_per_pixel,
     int max_bounces,
     int num_threads,
+    int use_russian_roulette,
+    int rr_start_depth,
 
     double light_x,
     double light_y,

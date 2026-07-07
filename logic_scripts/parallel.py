@@ -17,6 +17,30 @@ except ImportError:
     CPP_BACKEND_AVAILABLE = False
 
 
+
+def apply_optional_denoise(image):
+    if not getattr(config, "enable_denoise", False):
+        return image
+
+    denoise_mode = getattr(config, "denoise_mode", "median")
+    denoise_passes = int(getattr(config, "denoise_passes", 1))
+
+    result = image.copy()
+
+    if denoise_mode == "median":
+        from PIL import ImageFilter
+        for _ in range(max(1, denoise_passes)):
+            result = result.filter(ImageFilter.MedianFilter(size=3))
+        return result
+
+    if denoise_mode == "gaussian":
+        from PIL import ImageFilter
+        radius = float(getattr(config, "denoise_radius", 1.0))
+        return result.filter(ImageFilter.GaussianBlur(radius=radius))
+
+    return result
+
+
 def build_screen_coordinate_arrays(width, height):
     aspect_ratio = width / height
     viewport_height = 2.0
@@ -85,6 +109,8 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
     render_mode = getattr(config, "render_mode", "raytrace")
     samples_per_pixel = getattr(config, "samples_per_pixel", 1)
     max_bounces = getattr(config, "max_bounces", 2)
+    use_russian_roulette = 1 if getattr(config, "use_russian_roulette", False) else 0
+    rr_start_depth = getattr(config, "rr_start_depth", 2)
 
     t0 = time.perf_counter()
     screen_x_values, screen_y_values = build_screen_coordinate_arrays(width, height)
@@ -103,6 +129,8 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
                 samples_per_pixel,
                 max_bounces,
                 num_workers,
+                use_russian_roulette,
+                rr_start_depth,
 
                 light_position.x,
                 light_position.y,
@@ -208,6 +236,12 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
         t2 = time.perf_counter()
         image = Image.frombytes("RGB", (width, height), image_bytes)
         stage_timings["image_from_bytes"] = time.perf_counter() - t2
+
+        if getattr(config, "enable_denoise", False):
+            t_denoise = time.perf_counter()
+            image.save("render_raw.png")
+            image = apply_optional_denoise(image)
+            stage_timings["image_denoise"] = time.perf_counter() - t_denoise
 
         t3 = time.perf_counter()
         image.save("render.png")

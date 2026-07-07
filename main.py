@@ -47,12 +47,22 @@ if __name__ == "__main__":
     config.samples_per_pixel = 10
     config.max_bounces = 2
 
+    # Russian roulette
+    config.use_russian_roulette = True
+    config.rr_start_depth = 2
+
+    # Optional denoiser
+    config.enable_denoise = False #False #True
+    config.denoise_mode = "median"   # "median" or "gaussian"
+    config.denoise_passes = 1
+    config.denoise_radius = 1.0
+
 ####################################################################################
     num_workers = 10
     runs = 3
     width = 1280
     height = 720
-    max_depth = 0
+    max_depth = 3
     tile_size = 128
 ####################################################################################
 
@@ -63,6 +73,10 @@ if __name__ == "__main__":
         "samples_per_pixel": config.samples_per_pixel,
         "max_bounces": config.max_bounces,
         "render_mode": config.render_mode,
+        "use_russian_roulette": config.use_russian_roulette,
+        "rr_start_depth": config.rr_start_depth,
+        "enable_denoise": config.enable_denoise,
+        "denoise_mode": config.denoise_mode,
     }
 
     reset_logs_dir()

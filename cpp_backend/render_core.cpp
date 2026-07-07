@@ -77,6 +77,10 @@ inline Vec3d clamp01(const Vec3d& v) {
     };
 }
 
+inline double clamp_double(double v, double lo, double hi) {
+    return std::max(lo, std::min(hi, v));
+}
+
 inline Vec3d reflect_dir(const Vec3d& dir, const Vec3d& normal) {
     double d = dot(dir, normal);
     return normalize(sub(dir, mul(normal, 2.0 * d)));
@@ -633,6 +637,8 @@ Vec3d trace_path_ray_triangle_only(
     int depth,
     int max_bounces,
     uint64_t& rng_state,
+    int use_russian_roulette,
+    int rr_start_depth,
 
     const Vec3d& light_position,
     const Vec3d& background_color,
@@ -774,6 +780,8 @@ Vec3d trace_path_ray_triangle_only(
         depth + 1,
         max_bounces,
         rng_state,
+        use_russian_roulette,
+        rr_start_depth,
 
         light_position,
         background_color,
@@ -824,6 +832,17 @@ Vec3d trace_path_ray_triangle_only(
             return direct_color;
         }
         indirect_color = div_vec(indirect_color, p);
+    }
+
+    if (use_russian_roulette != 0 && depth >= rr_start_depth) {
+        double rr_probability = std::max({indirect_color.x, indirect_color.y, indirect_color.z, 0.0});
+        rr_probability = clamp_double(rr_probability, 0.10, 0.95);
+
+        if (random_double_01(rng_state) > rr_probability) {
+            indirect_color = {0.0, 0.0, 0.0};
+        } else {
+            indirect_color = div_vec(indirect_color, rr_probability);
+        }
     }
 
     Vec3d ambient_lift = mul(albedo, 0.025);
@@ -970,6 +989,8 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
     int samples_per_pixel,
     int max_bounces,
     int num_threads,
+    int use_russian_roulette,
+    int rr_start_depth,
 
     double light_x,
     double light_y,
@@ -1058,6 +1079,8 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
                     0,
                     max_bounces,
                     rng_state,
+                    use_russian_roulette,
+                    rr_start_depth,
 
                     light_position,
                     background_color,

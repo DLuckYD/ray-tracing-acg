@@ -283,6 +283,8 @@ PYBIND11_MODULE(rt_core, m) {
             int samples_per_pixel,
             int max_bounces,
             int num_threads,
+            int use_russian_roulette,
+            int rr_start_depth,
 
             double light_x,
             double light_y,
@@ -340,6 +342,8 @@ PYBIND11_MODULE(rt_core, m) {
                 samples_per_pixel,
                 max_bounces,
                 num_threads,
+                use_russian_roulette,
+                rr_start_depth,
 
                 light_x,
                 light_y,
