@@ -1246,9 +1246,6 @@ def build_obj_test_scene():
 
     objects = []
 
-    # =========================================================
-    # Main OBJ object: sword in the center
-    # =========================================================
     add_obj_to_scene(
         objects=objects,
         filepath="casa.obj",
@@ -1256,7 +1253,7 @@ def build_obj_test_scene():
         scale=0.7,
         color=Vec3(0.75, 0.78, 0.82),
         reflection=0.12,
-        transparency=0.0,
+        transparency=0.9,
         ior=1.0
     )
 

@@ -102,6 +102,12 @@ inline bool refract_dir(const Vec3d& direction, const Vec3d& normal, double n1, 
     return true;
 }
 
+inline double fresnel_schlick(double cos_theta, double n1, double n2) {
+    double r0 = (n1 - n2) / (n1 + n2);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * std::pow(1.0 - cos_theta, 5.0);
+}
+
 inline uint64_t xorshift64(uint64_t& state) {
     state ^= state << 13;
     state ^= state >> 7;
@@ -672,6 +678,10 @@ Vec3d trace_path_ray_triangle_only(
     const double* color_g,
     const double* color_b,
 
+    const double* reflection,
+    const double* transparency,
+    const double* ior,
+
     int node_count_total
 ) {
     if (depth >= max_bounces) {
@@ -713,17 +723,26 @@ Vec3d trace_path_ray_triangle_only(
 
     Vec3d hit_point = add(origin, mul(direction, t));
     Vec3d normal = normalize({normal_x[tri], normal_y[tri], normal_z[tri]});
-    Vec3d base_albedo = {color_r[tri], color_g[tri], color_b[tri]};
 
     if (dot(normal, direction) > 0.0) {
         normal = mul(normal, -1.0);
     }
 
+    Vec3d base_albedo = {color_r[tri], color_g[tri], color_b[tri]};
     Vec3d albedo = {
-        std::max(0.0, std::min(1.0, base_albedo.x * 0.82)),
-        std::max(0.0, std::min(1.0, base_albedo.y * 0.82)),
-        std::max(0.0, std::min(1.0, base_albedo.z * 0.82))
+        clamp_double(base_albedo.x * 0.82, 0.0, 1.0),
+        clamp_double(base_albedo.y * 0.82, 0.0, 1.0),
+        clamp_double(base_albedo.z * 0.82, 0.0, 1.0)
     };
+
+    double material_reflection = clamp_double(reflection[tri], 0.0, 1.0);
+    double material_transparency = clamp_double(transparency[tri], 0.0, 1.0);
+    double material_ior = std::max(1.0, ior[tri]);
+
+    double remaining_diffuse = 1.0 - material_reflection - material_transparency;
+    if (remaining_diffuse < 0.0) {
+        remaining_diffuse = 0.0;
+    }
 
     Vec3d direct_color = {0.0, 0.0, 0.0};
 
@@ -766,11 +785,187 @@ Vec3d trace_path_ray_triangle_only(
 
             if (!blocked) {
                 double attenuation = 1.35 / (1.0 + 0.0045 * distance_to_light * distance_to_light);
-                direct_color = mul(albedo, n_dot_l * attenuation);
+                direct_color = mul(albedo, n_dot_l * attenuation * remaining_diffuse);
             }
         }
     }
 
+    // Russian roulette for deeper paths
+    if (use_russian_roulette != 0 && depth >= rr_start_depth) {
+        double p = std::max({albedo.x, albedo.y, albedo.z, material_reflection, material_transparency, 0.25});
+        p = clamp_double(p, 0.10, 0.95);
+
+        if (random_double_01(rng_state) > p) {
+            return direct_color;
+        }
+
+        double inv_p = 1.0 / p;
+        albedo = mul(albedo, inv_p);
+        material_reflection *= inv_p;
+        material_transparency *= inv_p;
+        remaining_diffuse *= inv_p;
+    }
+
+    double chooser = random_double_01(rng_state);
+
+    // Transparent / dielectric branch
+    if (material_transparency > 0.0 && chooser < material_transparency) {
+    double n1 = 1.0;
+    double n2 = material_ior;
+    Vec3d oriented_normal = normal;
+    bool entering = dot(direction, normal) < 0.0;
+
+    if (!entering) {
+        oriented_normal = mul(normal, -1.0);
+        n1 = material_ior;
+        n2 = 1.0;
+    }
+
+    double cos_theta = std::max(0.0, -dot(direction, oriented_normal));
+
+    Vec3d refracted_dir;
+    bool refracted_ok = refract_dir(direction, oriented_normal, n1, n2, refracted_dir);
+
+    double fresnel = fresnel_schlick(cos_theta, n1, n2);
+    fresnel = clamp_double(fresnel, 0.02, 0.98);
+
+    Vec3d next_dir;
+    Vec3d next_origin;
+    Vec3d bounced;
+
+    // Slightly bias toward transmission so glass does not become unnaturally dark
+    double reflection_pick = fresnel * 0.65;
+
+    if (!refracted_ok || random_double_01(rng_state) < reflection_pick) {
+        next_dir = reflect_dir(direction, oriented_normal);
+        next_origin = add(hit_point, mul(oriented_normal, EPSILON * 2.0));
+    } else {
+        next_dir = refracted_dir;
+        next_origin = sub(hit_point, mul(oriented_normal, EPSILON * 2.0));
+    }
+
+    bounced = trace_path_ray_triangle_only(
+        next_origin,
+        next_dir,
+        depth + 1,
+        max_bounces,
+        rng_state,
+        use_russian_roulette,
+        rr_start_depth,
+
+        light_position,
+        background_color,
+
+        root_index,
+
+        flat_triangle_indices,
+
+        node_aabb_min_x,
+        node_aabb_min_y,
+        node_aabb_min_z,
+        node_aabb_max_x,
+        node_aabb_max_y,
+        node_aabb_max_z,
+
+        node_left,
+        node_right,
+        node_start,
+        node_count,
+        node_is_leaf,
+
+        v0x, v0y, v0z,
+        v1x, v1y, v1z,
+        v2x, v2y, v2z,
+
+        normal_x,
+        normal_y,
+        normal_z,
+
+        color_r,
+        color_g,
+        color_b,
+
+        reflection,
+        transparency,
+        ior,
+
+        node_count_total
+    );
+
+    // Very light tinting, but avoid strong absorption for now
+    Vec3d transmission_tint = mix(
+        Vec3d{1.0, 1.0, 1.0},
+        albedo,
+        0.08
+    );
+
+    bounced = mul_vec(bounced, transmission_tint);
+
+    // Add a tiny amount of local lift so transparent objects do not collapse into black silhouettes
+    Vec3d glass_lift = mul(albedo, 0.015);
+
+    return add(add(direct_color, bounced), glass_lift);
+    }
+
+    // Reflective branch
+    if (material_reflection > 0.0 && chooser < material_transparency + material_reflection) {
+        Vec3d reflected_dir = reflect_dir(direction, normal);
+        Vec3d reflect_origin = add(hit_point, mul(normal, EPSILON));
+
+        Vec3d bounced = trace_path_ray_triangle_only(
+            reflect_origin,
+            reflected_dir,
+            depth + 1,
+            max_bounces,
+            rng_state,
+            use_russian_roulette,
+            rr_start_depth,
+
+            light_position,
+            background_color,
+
+            root_index,
+
+            flat_triangle_indices,
+
+            node_aabb_min_x,
+            node_aabb_min_y,
+            node_aabb_min_z,
+            node_aabb_max_x,
+            node_aabb_max_y,
+            node_aabb_max_z,
+
+            node_left,
+            node_right,
+            node_start,
+            node_count,
+            node_is_leaf,
+
+            v0x, v0y, v0z,
+            v1x, v1y, v1z,
+            v2x, v2y, v2z,
+
+            normal_x,
+            normal_y,
+            normal_z,
+
+            color_r,
+            color_g,
+            color_b,
+
+            reflection,
+            transparency,
+            ior,
+
+            node_count_total
+        );
+
+        // slight tint from albedo for glossy-looking materials
+        Vec3d tinted = mix(bounced, mul_vec(bounced, albedo), 0.20);
+        return add(direct_color, tinted);
+    }
+
+    // Diffuse branch
     Vec3d bounce_dir = cosine_weighted_hemisphere_direction(normal, rng_state);
     Vec3d bounce_origin = add(hit_point, mul(normal, EPSILON));
 
@@ -815,38 +1010,18 @@ Vec3d trace_path_ray_triangle_only(
         color_g,
         color_b,
 
+        reflection,
+        transparency,
+        ior,
+
         node_count_total
     );
 
-    Vec3d sky_tint = {
-        0.92,
-        0.95,
-        1.0
-    };
-
+    Vec3d sky_tint = {0.92, 0.95, 1.0};
     Vec3d indirect_color = mul_vec(albedo, mul_vec(indirect, sky_tint));
 
-    if (depth >= 2) {
-        double p = std::max({albedo.x, albedo.y, albedo.z, 0.30});
-        if (random_double_01(rng_state) > p) {
-            return direct_color;
-        }
-        indirect_color = div_vec(indirect_color, p);
-    }
-
-    if (use_russian_roulette != 0 && depth >= rr_start_depth) {
-        double rr_probability = std::max({indirect_color.x, indirect_color.y, indirect_color.z, 0.0});
-        rr_probability = clamp_double(rr_probability, 0.10, 0.95);
-
-        if (random_double_01(rng_state) > rr_probability) {
-            indirect_color = {0.0, 0.0, 0.0};
-        } else {
-            indirect_color = div_vec(indirect_color, rr_probability);
-        }
-    }
-
-    Vec3d ambient_lift = mul(albedo, 0.025);
-    Vec3d result = add(add(mul(direct_color, 0.72), mul(indirect_color, 0.82)), ambient_lift);
+    Vec3d ambient_lift = mul(albedo, 0.025 * remaining_diffuse);
+    Vec3d result = add(add(mul(direct_color, 0.72), mul(indirect_color, 0.82 * remaining_diffuse)), ambient_lift);
     return result;
 }
 
@@ -1038,10 +1213,6 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
 
     int node_count_total
 ) {
-    (void)reflection;
-    (void)transparency;
-    (void)ior;
-
     std::vector<unsigned char> buffer(static_cast<size_t>(width * height * 3));
 
     Vec3d camera_origin = {0.0, 0.0, 0.0};
@@ -1114,6 +1285,10 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
                     color_g,
                     color_b,
 
+                    reflection,
+                    transparency,
+                    ior,
+
                     node_count_total
                 );
 
@@ -1123,6 +1298,7 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
             Vec3d color = div_vec(accumulated, static_cast<double>(samples_per_pixel));
             color = clamp01(color);
 
+            // gamma correction
             color.x = std::sqrt(color.x);
             color.y = std::sqrt(color.y);
             color.z = std::sqrt(color.z);

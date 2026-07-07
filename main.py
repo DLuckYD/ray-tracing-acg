@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     scene_name = "build_obj_test_scene"
     config.backend_mode = "cpp"
-    config.render_mode = "pathtrace"   # "raytrace" or "pathtrace"
+    config.render_mode = "raytrace"   # "raytrace" or "pathtrace"
 
     t_scene = time.perf_counter()
     objects, background_color, light_position = build_obj_test_scene()
@@ -53,15 +53,15 @@ if __name__ == "__main__":
 
     # Optional denoiser
     config.enable_denoise = False #False #True
-    config.denoise_mode = "median"   # "median" or "gaussian"
-    config.denoise_passes = 1
-    config.denoise_radius = 1.0
+    config.denoise_mode = "gaussian"   # "median" or "gaussian"
+    config.denoise_passes = 2
+    config.denoise_radius = 1
 
 ####################################################################################
-    num_workers = 10
-    runs = 3
-    width = 1280
-    height = 720
+    num_workers = 12
+    runs = 1
+    width = 1920
+    height = 1080
     max_depth = 3
     tile_size = 128
 ####################################################################################
