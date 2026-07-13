@@ -15,6 +15,15 @@ def build_triangle_data(objects):
     transparency = []
     ior = []
 
+    uv0_u, uv0_v = [], []
+    uv1_u, uv1_v = [], []
+    uv2_u, uv2_v = [], []
+    has_uv = []
+
+    material_name = []
+    texture_path = []
+    has_texture = []
+
     aabb_min_x, aabb_min_y, aabb_min_z = [], [], []
     aabb_max_x, aabb_max_y, aabb_max_z = [], [], []
 
@@ -69,6 +78,33 @@ def build_triangle_data(objects):
             transparency.append(obj.transparency)
             ior.append(obj.ior)
 
+            if obj.has_uv():
+                uv0_u.append(obj.uv0[0])
+                uv0_v.append(obj.uv0[1])
+
+                uv1_u.append(obj.uv1[0])
+                uv1_v.append(obj.uv1[1])
+
+                uv2_u.append(obj.uv2[0])
+                uv2_v.append(obj.uv2[1])
+
+                has_uv.append(1)
+            else:
+                uv0_u.append(0.0)
+                uv0_v.append(0.0)
+
+                uv1_u.append(0.0)
+                uv1_v.append(0.0)
+
+                uv2_u.append(0.0)
+                uv2_v.append(0.0)
+
+                has_uv.append(0)
+
+            material_name.append(obj.material_name if obj.material_name is not None else "")
+            texture_path.append(obj.texture_path if obj.texture_path is not None else "")
+            has_texture.append(1 if obj.texture_path else 0)
+
             tri_aabb = obj.get_aabb()
             aabb_min_x.append(tri_aabb.min_point.x)
             aabb_min_y.append(tri_aabb.min_point.y)
@@ -108,6 +144,18 @@ def build_triangle_data(objects):
         "reflection": np.asarray(reflection, dtype=np.float64),
         "transparency": np.asarray(transparency, dtype=np.float64),
         "ior": np.asarray(ior, dtype=np.float64),
+
+        "uv0_u": np.asarray(uv0_u, dtype=np.float64),
+        "uv0_v": np.asarray(uv0_v, dtype=np.float64),
+        "uv1_u": np.asarray(uv1_u, dtype=np.float64),
+        "uv1_v": np.asarray(uv1_v, dtype=np.float64),
+        "uv2_u": np.asarray(uv2_u, dtype=np.float64),
+        "uv2_v": np.asarray(uv2_v, dtype=np.float64),
+        "has_uv": np.asarray(has_uv, dtype=np.uint8),
+
+        "material_name": np.asarray(material_name, dtype=object),
+        "texture_path": np.asarray(texture_path, dtype=object),
+        "has_texture": np.asarray(has_texture, dtype=np.uint8),
 
         "aabb_min_x": np.asarray(aabb_min_x, dtype=np.float64),
         "aabb_min_y": np.asarray(aabb_min_y, dtype=np.float64),

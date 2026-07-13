@@ -2,29 +2,28 @@ import math
 from logic_scripts.math3d import Vec3
 from logic_scripts.aabb import AABB
 
+
 class Sphere:
-    def __init__(self, center, radius, color, reflection = 0.0, transparency = 0.0, ior = 1.0):
+    def __init__(self, center, radius, color, reflection=0.0, transparency=0.0, ior=1.0):
         self.center = center
         self.radius = radius
         self.color = color
         self.reflection = reflection
         self.transparency = transparency
-        self.ior = ior #index of refraction
+        self.ior = ior  # index of refraction
         radius_vec = Vec3(self.radius, self.radius, self.radius)
         self.aabb = AABB(self.center - radius_vec, self.center + radius_vec)
 
     def intersect(self, ray):
-
         oc = ray.origin - self.center
         a = ray.direction.dot(ray.direction)
         b = 2 * (oc.dot(ray.direction))
         c = oc.dot(oc) - self.radius ** 2
 
-        discriminant = b ** 2 - 4*a*c
+        discriminant = b ** 2 - 4 * a * c
 
         if discriminant < 0:
             return None
-
 
         t1 = (-b - math.sqrt(discriminant)) / (2 * a)
         t2 = (-b + math.sqrt(discriminant)) / (2 * a)
@@ -41,14 +40,16 @@ class Sphere:
     def get_aabb(self):
         return self.aabb
 
-
-
     def normal_at(self, hit_point):
-        return Vec3((hit_point.x - self.center.x)/self.radius ,(hit_point.y - self.center.y)/self.radius ,(hit_point.z - self.center.z)/self.radius)
+        return Vec3(
+            (hit_point.x - self.center.x) / self.radius,
+            (hit_point.y - self.center.y) / self.radius,
+            (hit_point.z - self.center.z) / self.radius
+        )
 
-class Plane :
 
-    def __init__ (self, point, normal , color, reflection = 0.0, transparency = 0.0, ior = 1.0):
+class Plane:
+    def __init__(self, point, normal, color, reflection=0.0, transparency=0.0, ior=1.0):
         self.point = point
         self.normal = normal.normalize()
         self.color = color
@@ -60,7 +61,7 @@ class Plane :
         denom = self.normal.dot(ray.direction)
         if abs(denom) < 0.000001:
             return None
-        t = self.normal.dot(((self.point - ray.origin))) / denom
+        t = self.normal.dot((self.point - ray.origin)) / denom
         if t <= 0:
             return None
         return t
@@ -71,17 +72,43 @@ class Plane :
     def get_aabb(self):
         return None
 
-class Triangle:
 
-    def __init__(self, v0 ,v1 , v2, color, reflection = 0.0, transparency = 0.0, ior = 1.0):
+class Triangle:
+    def __init__(
+        self,
+        v0,
+        v1,
+        v2,
+        color,
+        reflection=0.0,
+        transparency=0.0,
+        ior=1.0,
+        uv0=None,
+        uv1=None,
+        uv2=None,
+        material_name=None,
+        texture_path=None,
+    ):
         self.v0 = v0
         self.v1 = v1
         self.v2 = v2
+
         self.color = color
         self.reflection = reflection
-        self. transparency = transparency
-        self.ior = ior  # index of refraction
+        self.transparency = transparency
+        self.ior = ior
+
+        self.uv0 = uv0
+        self.uv1 = uv1
+        self.uv2 = uv2
+
+        self.material_name = material_name
+        self.texture_path = texture_path
+
         self.aabb = self.create_aabb()
+
+    def has_uv(self):
+        return self.uv0 is not None and self.uv1 is not None and self.uv2 is not None
 
     def normal_at(self, hit_point):
         edge1 = self.v1 - self.v0

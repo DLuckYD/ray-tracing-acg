@@ -1259,6 +1259,30 @@ def build_obj_test_scene():
 
     return objects, background_color, light_position
 
+def build_material_obj_test_scene():
+    light_position = Vec3(10, 10, 6)
+    background_color = Vec3(0.08, 0.08, 0.10)
+
+    objects = []
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="casa.obj",
+        position=Vec3(-1.2, -1, -3.0),
+        scale=0.7,
+        color=None,
+        reflection=None,
+        transparency=None,
+        ior=None,
+        use_mtl_color=True,
+        use_mtl_material_properties=True,
+    )
+
+    return objects, background_color, light_position
+
+
+
+
 def build_showcase_scene_v3():
     light_position = Vec3(-7, 7, 4)
     background_color = Vec3(0.16, 0.18, 0.22)
