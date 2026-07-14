@@ -1259,7 +1259,7 @@ def build_obj_test_scene():
 
     return objects, background_color, light_position
 
-def build_material_obj_test_scene():
+def casa_scene():
     light_position = Vec3(10, 10, 6)
     background_color = Vec3(0.08, 0.08, 0.10)
 
@@ -1271,6 +1271,27 @@ def build_material_obj_test_scene():
         position=Vec3(-1.2, -1, -3.0),
         scale=0.7,
         color=None,
+        reflection=0.0,
+        transparency=None,
+        ior=None,
+        use_mtl_color=True,
+        use_mtl_material_properties=True,
+    )
+
+    return objects, background_color, light_position
+
+def DeaverHouse_scene():
+    light_position = Vec3(10, 10, 6)
+    background_color = Vec3(0.08, 0.08, 0.10)
+
+    objects = []
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="DeaverHouse.obj",
+        position=Vec3(-0.3, -0.6, -3.0),
+        scale=0.7,
+        color=None,
         reflection=None,
         transparency=None,
         ior=None,
@@ -1280,6 +1301,47 @@ def build_material_obj_test_scene():
 
     return objects, background_color, light_position
 
+def castle_scene():
+    light_position = Vec3(10, 10, 6)
+    background_color = Vec3(0.08, 0.08, 0.10)
+
+    objects = []
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="SFMC_main.obj",
+        position=Vec3(-1, -5, -10.7),
+        scale=0.1,
+        color=None,
+        reflection=None,
+        transparency=None,
+        ior=None,
+        use_mtl_color=True,
+        use_mtl_material_properties=True,
+    )
+
+    return objects, background_color, light_position
+
+def dragon_scene():
+    light_position = Vec3(10, 10, 6)
+    background_color = Vec3(0.08, 0.08, 0.10)
+
+    objects = []
+
+    add_obj_to_scene(
+        objects=objects,
+        filepath="Carrito_Dragon_Armas.obj",
+        position=Vec3(-2, -2, -4.5),
+        scale=1,
+        color=None,
+        reflection=None,
+        transparency=None,
+        ior=None,
+        use_mtl_color=True,
+        use_mtl_material_properties=True,
+    )
+
+    return objects, background_color, light_position
 
 
 

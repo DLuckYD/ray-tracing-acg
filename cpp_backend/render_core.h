@@ -49,10 +49,25 @@ std::vector<unsigned char> render_triangle_image_cpp(
     const double* transparency,
     const double* ior,
 
+    const double* uv0_u,
+    const double* uv0_v,
+    const double* uv1_u,
+    const double* uv1_v,
+    const double* uv2_u,
+    const double* uv2_v,
+    const unsigned char* has_uv,
+
+    const int* texture_ids_per_triangle,
+    const int* texture_widths,
+    const int* texture_heights,
+    const int* texture_offsets,
+    const unsigned char* texture_pixels,
+
     const double* screen_x_values,
     const double* screen_y_values,
 
-    int node_count_total
+    int node_count_total,
+    int texture_count
 );
 
 std::vector<unsigned char> render_triangle_path_traced_image_cpp(
@@ -105,8 +120,23 @@ std::vector<unsigned char> render_triangle_path_traced_image_cpp(
     const double* transparency,
     const double* ior,
 
+    const double* uv0_u,
+    const double* uv0_v,
+    const double* uv1_u,
+    const double* uv1_v,
+    const double* uv2_u,
+    const double* uv2_v,
+    const unsigned char* has_uv,
+
+    const int* texture_ids_per_triangle,
+    const int* texture_widths,
+    const int* texture_heights,
+    const int* texture_offsets,
+    const unsigned char* texture_pixels,
+
     const double* screen_x_values,
     const double* screen_y_values,
 
-    int node_count_total
+    int node_count_total,
+    int texture_count
 );

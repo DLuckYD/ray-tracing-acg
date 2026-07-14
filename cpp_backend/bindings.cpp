@@ -215,6 +215,20 @@ PYBIND11_MODULE(rt_core, m) {
             py::array_t<double, py::array::c_style | py::array::forcecast> transparency,
             py::array_t<double, py::array::c_style | py::array::forcecast> ior,
 
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv0_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv0_v,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv1_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv1_v,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv2_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv2_v,
+            py::array_t<unsigned char, py::array::c_style | py::array::forcecast> has_uv,
+
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_ids_per_triangle,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_widths,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_heights,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_offsets,
+            py::array_t<unsigned char, py::array::c_style | py::array::forcecast> texture_pixels,
+
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_x_values,
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_y_values
         ) {
@@ -265,10 +279,25 @@ PYBIND11_MODULE(rt_core, m) {
                 transparency.data(),
                 ior.data(),
 
+                uv0_u.data(),
+                uv0_v.data(),
+                uv1_u.data(),
+                uv1_v.data(),
+                uv2_u.data(),
+                uv2_v.data(),
+                has_uv.data(),
+
+                texture_ids_per_triangle.data(),
+                texture_widths.data(),
+                texture_heights.data(),
+                texture_offsets.data(),
+                texture_pixels.data(),
+
                 screen_x_values.data(),
                 screen_y_values.data(),
 
-                static_cast<int>(node_left.size())
+                static_cast<int>(node_left.size()),
+                static_cast<int>(texture_widths.size())
             );
 
             return py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size());
@@ -333,6 +362,20 @@ PYBIND11_MODULE(rt_core, m) {
             py::array_t<double, py::array::c_style | py::array::forcecast> transparency,
             py::array_t<double, py::array::c_style | py::array::forcecast> ior,
 
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv0_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv0_v,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv1_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv1_v,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv2_u,
+            py::array_t<double, py::array::c_style | py::array::forcecast> uv2_v,
+            py::array_t<unsigned char, py::array::c_style | py::array::forcecast> has_uv,
+
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_ids_per_triangle,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_widths,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_heights,
+            py::array_t<int, py::array::c_style | py::array::forcecast> texture_offsets,
+            py::array_t<unsigned char, py::array::c_style | py::array::forcecast> texture_pixels,
+
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_x_values,
             py::array_t<double, py::array::c_style | py::array::forcecast> screen_y_values
         ) {
@@ -386,10 +429,25 @@ PYBIND11_MODULE(rt_core, m) {
                 transparency.data(),
                 ior.data(),
 
+                uv0_u.data(),
+                uv0_v.data(),
+                uv1_u.data(),
+                uv1_v.data(),
+                uv2_u.data(),
+                uv2_v.data(),
+                has_uv.data(),
+
+                texture_ids_per_triangle.data(),
+                texture_widths.data(),
+                texture_heights.data(),
+                texture_offsets.data(),
+                texture_pixels.data(),
+
                 screen_x_values.data(),
                 screen_y_values.data(),
 
-                static_cast<int>(node_left.size())
+                static_cast<int>(node_left.size()),
+                static_cast<int>(texture_widths.size())
             );
 
             return py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size());

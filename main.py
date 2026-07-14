@@ -3,7 +3,7 @@ import time
 from PIL import Image
 
 import logic_scripts.config
-from logic_scripts.scenes import build_obj_test_scene, build_material_obj_test_scene
+from logic_scripts.scenes import build_obj_test_scene, casa_scene, DeaverHouse_scene, castle_scene , dragon_scene
 from logic_scripts.parallel import benchmark_render_parallel_tiles
 from logic_scripts.benchmark_logger import reset_logs_dir, write_run_log, write_summary_log
 from triangle_logic.triangle_data import build_triangle_data
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     config.render_mode = "pathtrace"   # "raytrace" or "pathtrace"
 
     t_scene = time.perf_counter()
-    objects, background_color, light_position = build_material_obj_test_scene()
+    objects, background_color, light_position = castle_scene() #casa_scene , DeaverHouse_scene , castle_scene() , dragon_scene
     scene_build_time = time.perf_counter() - t_scene
 
     print(f"Current amount of objects: {len(objects)}")

@@ -17,7 +17,6 @@ except ImportError:
     CPP_BACKEND_AVAILABLE = False
 
 
-
 def apply_optional_denoise(image):
     if not getattr(config, "enable_denoise", False):
         return image
@@ -57,6 +56,72 @@ def build_screen_coordinate_arrays(width, height):
         screen_y_values[y] = (0.5 - v) * viewport_height
 
     return screen_x_values, screen_y_values
+
+
+def build_texture_payload(triangle_data):
+    texture_paths = triangle_data.get("texture_path")
+    has_texture = triangle_data.get("has_texture")
+
+    if texture_paths is None or has_texture is None or len(texture_paths) == 0:
+        return {
+            "texture_ids_per_triangle": np.empty(0, dtype=np.int32),
+            "texture_widths": np.empty(0, dtype=np.int32),
+            "texture_heights": np.empty(0, dtype=np.int32),
+            "texture_offsets": np.empty(0, dtype=np.int32),
+            "texture_pixels": np.empty(0, dtype=np.uint8),
+            "texture_count": 0,
+        }
+
+    triangle_count = len(texture_paths)
+    texture_ids_per_triangle = np.full(triangle_count, -1, dtype=np.int32)
+
+    unique_texture_to_id = {}
+    texture_widths = []
+    texture_heights = []
+    texture_offsets = []
+    texture_bytes = bytearray()
+
+    for tri_index in range(triangle_count):
+        if int(has_texture[tri_index]) == 0:
+            continue
+
+        path = texture_paths[tri_index]
+        if not path:
+            continue
+
+        if path not in unique_texture_to_id:
+            image = Image.open(path).convert("RGB")
+            image_np = np.asarray(image, dtype=np.uint8)
+
+            tex_id = len(texture_widths)
+            unique_texture_to_id[path] = tex_id
+
+            texture_widths.append(int(image.width))
+            texture_heights.append(int(image.height))
+            texture_offsets.append(len(texture_bytes))
+
+            texture_bytes.extend(image_np.tobytes())
+
+        texture_ids_per_triangle[tri_index] = unique_texture_to_id[path]
+
+    if len(texture_widths) == 0:
+        return {
+            "texture_ids_per_triangle": texture_ids_per_triangle,
+            "texture_widths": np.empty(0, dtype=np.int32),
+            "texture_heights": np.empty(0, dtype=np.int32),
+            "texture_offsets": np.empty(0, dtype=np.int32),
+            "texture_pixels": np.empty(0, dtype=np.uint8),
+            "texture_count": 0,
+        }
+
+    return {
+        "texture_ids_per_triangle": texture_ids_per_triangle,
+        "texture_widths": np.asarray(texture_widths, dtype=np.int32),
+        "texture_heights": np.asarray(texture_heights, dtype=np.int32),
+        "texture_offsets": np.asarray(texture_offsets, dtype=np.int32),
+        "texture_pixels": np.frombuffer(bytes(texture_bytes), dtype=np.uint8),
+        "texture_count": len(texture_widths),
+    }
 
 
 def render_full_image_python(width, height, objects, background_color, light_position, depth, max_depth):
@@ -120,6 +185,13 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
         triangle_data = config.triangle_data
         triangle_bvh = config.triangle_bvh_root
 
+        t_tex = time.perf_counter()
+        texture_payload = getattr(config, "texture_payload", None)
+        if texture_payload is None:
+            texture_payload = build_texture_payload(triangle_data)
+            config.texture_payload = texture_payload
+        stage_timings["build_texture_payload"] = time.perf_counter() - t_tex
+
         if render_mode == "pathtrace":
             t1 = time.perf_counter()
 
@@ -171,6 +243,20 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
                 triangle_data["reflection"],
                 triangle_data["transparency"],
                 triangle_data["ior"],
+
+                triangle_data["uv0_u"],
+                triangle_data["uv0_v"],
+                triangle_data["uv1_u"],
+                triangle_data["uv1_v"],
+                triangle_data["uv2_u"],
+                triangle_data["uv2_v"],
+                triangle_data["has_uv"],
+
+                texture_payload["texture_ids_per_triangle"],
+                texture_payload["texture_widths"],
+                texture_payload["texture_heights"],
+                texture_payload["texture_offsets"],
+                texture_payload["texture_pixels"],
 
                 screen_x_values,
                 screen_y_values,
@@ -227,6 +313,20 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
                 triangle_data["transparency"],
                 triangle_data["ior"],
 
+                triangle_data["uv0_u"],
+                triangle_data["uv0_v"],
+                triangle_data["uv1_u"],
+                triangle_data["uv1_v"],
+                triangle_data["uv2_u"],
+                triangle_data["uv2_v"],
+                triangle_data["has_uv"],
+
+                texture_payload["texture_ids_per_triangle"],
+                texture_payload["texture_widths"],
+                texture_payload["texture_heights"],
+                texture_payload["texture_offsets"],
+                texture_payload["texture_pixels"],
+
                 screen_x_values,
                 screen_y_values,
             )
@@ -256,7 +356,6 @@ def render_parallel_tiles(width, height, objects, background_color, light_positi
 
         return image, stage_timings
 
-    # fallback path
     t1 = time.perf_counter()
     image = render_full_image_python(
         width,
