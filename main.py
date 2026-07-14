@@ -20,10 +20,10 @@ if __name__ == "__main__":
 
     scene_name = "build_obj_test_scene"
     config.backend_mode = "cpp"
-    config.render_mode = "pathtrace"   # "raytrace" or "pathtrace"
+    config.render_mode = "raytrace"   # "raytrace" or "pathtrace"
 
     t_scene = time.perf_counter()
-    objects, background_color, light_position = castle_scene() #casa_scene , DeaverHouse_scene , castle_scene() , dragon_scene
+    objects, background_color, light_position = dragon_scene() #casa_scene , DeaverHouse_scene , castle_scene() , dragon_scene
     scene_build_time = time.perf_counter() - t_scene
 
     print(f"Current amount of objects: {len(objects)}")
@@ -44,8 +44,8 @@ if __name__ == "__main__":
     config.non_bvh_objects = []
 
     # Path tracing parameters
-    config.samples_per_pixel = 10
-    config.max_bounces = 2
+    config.samples_per_pixel = 20
+    config.max_bounces = 4
 
     # Russian roulette
     config.use_russian_roulette = True
@@ -54,14 +54,16 @@ if __name__ == "__main__":
     # Optional denoiser
     config.enable_denoise = False #False #True
     config.denoise_mode = "gaussian"   # "median" or "gaussian"
-    config.denoise_passes = 2
-    config.denoise_radius = 1
+    config.denoise_passes = 1
+    config.denoise_radius = 0.3
 
 ####################################################################################
     num_workers = 12
     runs = 1
-    width = 1920
-    height = 1080
+    width = 6000
+    height = 4000
+    # width = 1920
+    # height = 1080
     max_depth = 3
     tile_size = 128
 ####################################################################################
