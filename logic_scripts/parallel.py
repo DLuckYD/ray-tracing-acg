@@ -21,23 +21,249 @@ def apply_optional_denoise(image):
     if not getattr(config, "enable_denoise", False):
         return image
 
-    denoise_mode = getattr(config, "denoise_mode", "median")
+    denoise_mode = getattr(config, "denoise_mode", "bilateral")
     denoise_passes = int(getattr(config, "denoise_passes", 1))
 
-    result = image.copy()
-
+    # ------------------------------------------------------------
+    # 1. Median
+    # ------------------------------------------------------------
     if denoise_mode == "median":
         from PIL import ImageFilter
+
+        result = image.copy()
+
+        kernel = int(getattr(config, "denoise_kernel", 3))
+        if kernel % 2 == 0:
+            kernel += 1
+
+        kernel = max(3, min(kernel, 7))
+
         for _ in range(max(1, denoise_passes)):
-            result = result.filter(ImageFilter.MedianFilter(size=3))
+            result = result.filter(
+                ImageFilter.MedianFilter(size=kernel)
+            )
+
         return result
 
+    # ------------------------------------------------------------
+    # 2. Gaussian
+    # ------------------------------------------------------------
     if denoise_mode == "gaussian":
         from PIL import ImageFilter
-        radius = float(getattr(config, "denoise_radius", 1.0))
-        return result.filter(ImageFilter.GaussianBlur(radius=radius))
 
-    return result
+        result = image.copy()
+
+        radius = float(
+            getattr(config, "denoise_radius", 0.5)
+        )
+
+        for _ in range(max(1, denoise_passes)):
+            result = result.filter(
+                ImageFilter.GaussianBlur(radius=radius)
+            )
+
+        return result
+
+    # ------------------------------------------------------------
+    # 3. Bilateral
+    #
+    # Good general-purpose denoiser for path tracing:
+    # smooths noise while preserving edges.
+    # ------------------------------------------------------------
+    if denoise_mode == "bilateral":
+        import cv2
+
+        src = np.asarray(image, dtype=np.uint8)
+
+        # PIL = RGB
+        # OpenCV usually works in BGR
+        result = cv2.cvtColor(src, cv2.COLOR_RGB2BGR)
+
+        diameter = int(
+            getattr(config, "denoise_diameter", 5)
+        )
+
+        sigma_color = float(
+            getattr(config, "denoise_sigma_color", 35.0)
+        )
+
+        sigma_space = float(
+            getattr(config, "denoise_sigma_space", 5.0)
+        )
+
+        diameter = max(3, diameter)
+
+        if diameter % 2 == 0:
+            diameter += 1
+
+        for _ in range(max(1, denoise_passes)):
+            result = cv2.bilateralFilter(
+                result,
+                d=diameter,
+                sigmaColor=sigma_color,
+                sigmaSpace=sigma_space
+            )
+
+        result = cv2.cvtColor(
+            result,
+            cv2.COLOR_BGR2RGB
+        )
+
+        return Image.fromarray(result)
+
+    # ------------------------------------------------------------
+    # 4. Adaptive outlier removal
+    #
+    # Detects pixels strongly differing from their neighbourhood
+    # and replaces only those pixels with the local median.
+    #
+    # Good for isolated bright/dark Monte Carlo fireflies.
+    # ------------------------------------------------------------
+    if denoise_mode == "adaptive":
+        import cv2
+
+        src = np.asarray(
+            image,
+            dtype=np.float32
+        )
+
+        kernel = int(
+            getattr(config, "denoise_kernel", 3)
+        )
+
+        if kernel % 2 == 0:
+            kernel += 1
+
+        kernel = max(3, min(kernel, 7))
+
+        threshold = float(
+            getattr(config, "denoise_threshold", 35.0)
+        )
+
+        result = src.copy()
+
+        for _ in range(max(1, denoise_passes)):
+
+            # Median reference image
+            median = cv2.medianBlur(
+                np.clip(result, 0, 255).astype(np.uint8),
+                kernel
+            ).astype(np.float32)
+
+            # Difference from local median
+            diff = np.linalg.norm(
+                result - median,
+                axis=2
+            )
+
+            # Only replace obvious outliers
+            mask = diff > threshold
+
+            result[mask] = median[mask]
+
+        return Image.fromarray(
+            np.clip(result, 0, 255).astype(np.uint8)
+        )
+
+    # ------------------------------------------------------------
+    # 5. Hybrid
+    #
+    # Recommended mode:
+    #
+    # adaptive outlier removal
+    # +
+    # bilateral smoothing
+    #
+    # Removes fireflies first, then smooths remaining Monte Carlo
+    # noise while preserving edges.
+    # ------------------------------------------------------------
+    if denoise_mode == "hybrid":
+        import cv2
+
+        src = np.asarray(
+            image,
+            dtype=np.float32
+        )
+
+        kernel = int(
+            getattr(config, "denoise_kernel", 3)
+        )
+
+        if kernel % 2 == 0:
+            kernel += 1
+
+        kernel = max(3, min(kernel, 7))
+
+        threshold = float(
+            getattr(config, "denoise_threshold", 30.0)
+        )
+
+        diameter = int(
+            getattr(config, "denoise_diameter", 5)
+        )
+
+        if diameter % 2 == 0:
+            diameter += 1
+
+        sigma_color = float(
+            getattr(config, "denoise_sigma_color", 30.0)
+        )
+
+        sigma_space = float(
+            getattr(config, "denoise_sigma_space", 5.0)
+        )
+
+        result = src.copy()
+
+        for _ in range(max(1, denoise_passes)):
+
+            # ----------------------------------------
+            # Step 1:
+            # remove isolated noisy outliers/fireflies
+            # ----------------------------------------
+            median = cv2.medianBlur(
+                np.clip(result, 0, 255).astype(np.uint8),
+                kernel
+            ).astype(np.float32)
+
+            diff = np.linalg.norm(
+                result - median,
+                axis=2
+            )
+
+            mask = diff > threshold
+
+            result[mask] = median[mask]
+
+            # ----------------------------------------
+            # Step 2:
+            # edge-preserving smoothing
+            # ----------------------------------------
+            tmp = np.clip(
+                result,
+                0,
+                255
+            ).astype(np.uint8)
+
+            tmp = cv2.bilateralFilter(
+                tmp,
+                d=diameter,
+                sigmaColor=sigma_color,
+                sigmaSpace=sigma_space
+            )
+
+            result = tmp.astype(np.float32)
+
+        return Image.fromarray(
+            np.clip(result, 0, 255).astype(np.uint8)
+        )
+
+    print(
+        f"Unknown denoise mode '{denoise_mode}'. "
+        f"Returning original image."
+    )
+
+    return image
 
 
 def build_screen_coordinate_arrays(width, height):
