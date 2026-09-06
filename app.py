@@ -43,6 +43,7 @@ class RayTracerApp:
 
         self.zoom_factor = 1.0
         self.is_rendering = False
+
         self.max_workers = max(1, os.cpu_count() or 1)
 
         self._build_ui()
@@ -83,7 +84,7 @@ class RayTracerApp:
         preview_frame.rowconfigure(1, weight=1)
 
         # --------------------------------------------------------
-        # Preview toolbar
+        # Toolbar
         # --------------------------------------------------------
 
         preview_toolbar = ttk.Frame(preview_frame)
@@ -224,10 +225,9 @@ class RayTracerApp:
             sticky="ns"
         )
 
-        # Canvas so settings can scroll vertically
         controls_canvas = tk.Canvas(
             controls_container,
-            width=300,
+            width=310,
             highlightthickness=0
         )
 
@@ -243,8 +243,7 @@ class RayTracerApp:
 
         controls_canvas.pack(
             side="left",
-            fill="y",
-            expand=False
+            fill="y"
         )
 
         controls_scroll.pack(
@@ -289,7 +288,7 @@ class RayTracerApp:
         row = 0
 
         # ========================================================
-        # GENERAL SETTINGS
+        # GENERAL
         # ========================================================
 
         ttk.Label(
@@ -336,7 +335,7 @@ class RayTracerApp:
 
         row += 1
 
-        # Render mode
+        # Renderer
         ttk.Label(
             controls,
             text="Renderer"
@@ -375,9 +374,9 @@ class RayTracerApp:
 
         row += 1
 
-        # --------------------------------------------------------
-        # Resolution
-        # --------------------------------------------------------
+        # ========================================================
+        # RESOLUTION
+        # ========================================================
 
         ttk.Separator(
             controls
@@ -456,11 +455,13 @@ class RayTracerApp:
 
         row += 1
 
-        # --------------------------------------------------------
-        # Workers
-        # --------------------------------------------------------
+        # ========================================================
+        # WORKERS
+        # ========================================================
 
-        workers_label_frame = ttk.Frame(controls)
+        workers_label_frame = ttk.Frame(
+            controls
+        )
 
         workers_label_frame.grid(
             row=row,
@@ -505,8 +506,41 @@ class RayTracerApp:
         row += 1
 
         # ========================================================
+        # RAY DEPTH
+        # ========================================================
+
+        ttk.Label(
+            controls,
+            text="Ray Max Depth"
+        ).grid(
+            row=row,
+            column=0,
+            sticky="w",
+            pady=4
+        )
+
+        self.max_depth_var = tk.IntVar(
+            value=3
+        )
+
+        ttk.Spinbox(
+            controls,
+            from_=1,
+            to=32,
+            textvariable=self.max_depth_var,
+            width=10
+        ).grid(
+            row=row,
+            column=1,
+            sticky="ew",
+            pady=4
+        )
+
+        row += 1
+
+        # ========================================================
         # PATH TRACING
-        # ====================Workers must be at least 1====================================
+        # ========================================================
 
         ttk.Separator(
             controls
@@ -541,7 +575,7 @@ class RayTracerApp:
 
         row += 1
 
-        # SPP
+        # Samples
         spp_label = ttk.Label(
             controls,
             text="Samples / Pixel"
@@ -562,8 +596,10 @@ class RayTracerApp:
             value=20
         )
 
-        spp_entry = ttk.Entry(
+        spp_entry = ttk.Spinbox(
             controls,
+            from_=1,
+            to=10000,
             textvariable=self.spp_var
         )
 
@@ -601,8 +637,10 @@ class RayTracerApp:
             value=4
         )
 
-        bounce_entry = ttk.Entry(
+        bounce_entry = ttk.Spinbox(
             controls,
+            from_=1,
+            to=64,
             textvariable=self.bounces_var
         )
 
@@ -664,8 +702,10 @@ class RayTracerApp:
             value=2
         )
 
-        rr_entry = ttk.Entry(
+        rr_entry = ttk.Spinbox(
             controls,
+            from_=1,
+            to=64,
             textvariable=self.rr_depth_var
         )
 
@@ -683,7 +723,7 @@ class RayTracerApp:
         row += 1
 
         # ========================================================
-        # DENOISE
+        # DENOISING
         # ========================================================
 
         ttk.Separator(
@@ -777,8 +817,10 @@ class RayTracerApp:
             value=1
         )
 
-        ttk.Entry(
+        ttk.Spinbox(
             controls,
+            from_=1,
+            to=10,
             textvariable=self.denoise_passes_var
         ).grid(
             row=row,
@@ -890,7 +932,6 @@ class RayTracerApp:
 
         row += 1
 
-        # Progress bar
         self.progress = ttk.Progressbar(
             controls,
             mode="indeterminate"
@@ -906,7 +947,6 @@ class RayTracerApp:
 
         row += 1
 
-        # Status
         self.status_var = tk.StringVar(
             value="Ready"
         )
@@ -914,7 +954,7 @@ class RayTracerApp:
         ttk.Label(
             controls,
             textvariable=self.status_var,
-            wraplength=270
+            wraplength=280
         ).grid(
             row=row,
             column=0,
@@ -926,7 +966,7 @@ class RayTracerApp:
         self._update_path_controls()
 
     # ============================================================
-    # PATH TRACE ENABLE/DISABLE
+    # PATH CONTROLS
     # ============================================================
 
     def _update_path_controls(self, event=None):
@@ -948,6 +988,79 @@ class RayTracerApp:
                 pass
 
     # ============================================================
+    # VALIDATION
+    # ============================================================
+
+    def _read_and_validate_settings(self):
+        width = int(self.width_var.get())
+        height = int(self.height_var.get())
+        workers = int(self.workers_var.get())
+        max_depth = int(self.max_depth_var.get())
+
+        if width < 1:
+            raise ValueError(
+                "Width must be at least 1."
+            )
+
+        if height < 1:
+            raise ValueError(
+                "Height must be at least 1."
+            )
+
+        if workers < 1:
+            raise ValueError(
+                "Workers must be at least 1."
+            )
+
+        if workers > self.max_workers:
+            raise ValueError(
+                f"Workers cannot exceed the number of available "
+                f"logical CPU threads ({self.max_workers})."
+            )
+
+        if max_depth < 1:
+            raise ValueError(
+                "Ray max depth must be at least 1."
+            )
+
+        if self.render_mode_var.get() == "pathtrace":
+            spp = int(self.spp_var.get())
+            max_bounces = int(self.bounces_var.get())
+            rr_depth = int(self.rr_depth_var.get())
+
+            if spp < 1:
+                raise ValueError(
+                    "Samples per pixel must be at least 1."
+                )
+
+            if max_bounces < 1:
+                raise ValueError(
+                    "Max bounces must be at least 1."
+                )
+
+            if rr_depth < 1:
+                raise ValueError(
+                    "Russian Roulette start depth must be at least 1."
+                )
+
+        if self.denoise_enabled_var.get():
+            passes = int(
+                self.denoise_passes_var.get()
+            )
+
+            if passes < 1:
+                raise ValueError(
+                    "Denoise passes must be at least 1."
+                )
+
+        return {
+            "width": width,
+            "height": height,
+            "workers": workers,
+            "max_depth": max_depth,
+        }
+
+    # ============================================================
     # RENDER START
     # ============================================================
 
@@ -956,33 +1069,7 @@ class RayTracerApp:
             return
 
         try:
-            width = int(
-                self.width_var.get()
-            )
-
-            height = int(
-                self.height_var.get()
-            )
-
-            workers = int(
-                self.workers_var.get()
-            )
-
-            if width <= 0 or height <= 0:
-                raise ValueError(
-                    "Resolution must be positive."
-                )
-
-            if workers < 1:
-                raise ValueError(
-                    "Workers must be at least 1."
-                )
-
-            if workers > self.max_workers:
-                raise ValueError(
-                    f"Workers cannot exceed the number of available "
-                    f"logical CPU threads ({self.max_workers})."
-                )
+            self._read_and_validate_settings()
 
         except Exception as exc:
             messagebox.showerror(
@@ -1021,33 +1108,27 @@ class RayTracerApp:
 
     def _render_worker(self):
         try:
+            settings = (
+                self._read_and_validate_settings()
+            )
+
             scene_display_name = (
                 self.scene_var.get()
             )
 
-            scene_builder = SCENES[
-                scene_display_name
-            ]
-
-            width = int(
-                self.width_var.get()
+            scene_builder = (
+                SCENES[
+                    scene_display_name
+                ]
             )
 
-            height = int(
-                self.height_var.get()
-            )
-
-            workers = max(
-                1,
-                min(workers, self.max_workers)
-            )
-
-            max_depth = int(
-                self.max_depth_var.get()
-            )
+            width = settings["width"]
+            height = settings["height"]
+            workers = settings["workers"]
+            max_depth = settings["max_depth"]
 
             # ----------------------------------------------------
-            # Global renderer configuration
+            # Renderer config
             # ----------------------------------------------------
 
             config.backend_mode = "cpp"
@@ -1102,10 +1183,7 @@ class RayTracerApp:
 
             config.denoise_sigma_space = 5.0
 
-            # ----------------------------------------------------
-            # Clear previous scene texture cache
-            # ----------------------------------------------------
-
+            # clear old texture cache
             config.texture_payload = None
 
             self.root.after(
@@ -1120,7 +1198,7 @@ class RayTracerApp:
             )
 
             # ----------------------------------------------------
-            # Build Scene
+            # Scene
             # ----------------------------------------------------
 
             scene_start = (
@@ -1262,7 +1340,7 @@ class RayTracerApp:
             )
 
     # ============================================================
-    # RENDER FINISHED
+    # FINISHED
     # ============================================================
 
     def _render_finished(
@@ -1291,6 +1369,8 @@ class RayTracerApp:
             f"Finished\n"
             f"Total: {total_time:.2f}s\n"
             f"Render: {render_time:.2f}s\n"
+            f"Scene: {scene_time:.2f}s\n"
+            f"Triangle data: {triangle_time:.2f}s\n"
             f"BVH: {bvh_time:.2f}s\n"
             f"Triangles: {object_count}"
         )
@@ -1298,7 +1378,7 @@ class RayTracerApp:
         self.fit_image()
 
     # ============================================================
-    # RENDER FAILED
+    # FAILED
     # ============================================================
 
     def _render_failed(self, error):
@@ -1310,6 +1390,11 @@ class RayTracerApp:
             text="Render",
             state="normal"
         )
+
+        if self.current_image is not None:
+            self.save_button.configure(
+                state="normal"
+            )
 
         self.status_var.set(
             "Render failed"
@@ -1344,9 +1429,11 @@ class RayTracerApp:
             )
         )
 
-        resized = self.current_image.resize(
-            (width, height),
-            Image.Resampling.LANCZOS
+        resized = (
+            self.current_image.resize(
+                (width, height),
+                Image.Resampling.LANCZOS
+            )
         )
 
         self.preview_photo = (
@@ -1378,7 +1465,7 @@ class RayTracerApp:
         )
 
     # ============================================================
-    # FIT IMAGE
+    # FIT
     # ============================================================
 
     def fit_image(self):
@@ -1397,22 +1484,14 @@ class RayTracerApp:
             self.canvas.winfo_height()
         )
 
-        image_width = (
-            self.current_image.width
-        )
-
-        image_height = (
-            self.current_image.height
-        )
-
         scale_x = (
             canvas_width
-            / image_width
+            / self.current_image.width
         )
 
         scale_y = (
             canvas_height
-            / image_height
+            / self.current_image.height
         )
 
         self.zoom_factor = min(
@@ -1454,7 +1533,7 @@ class RayTracerApp:
             * multiplier
         )
 
-        new_zoom = max(
+        self.zoom_factor = max(
             0.05,
             min(
                 new_zoom,
@@ -1462,14 +1541,10 @@ class RayTracerApp:
             )
         )
 
-        self.zoom_factor = (
-            new_zoom
-        )
-
         self._redraw_canvas_image()
 
     # ============================================================
-    # MOUSE WHEEL ZOOM
+    # MOUSE WHEEL
     # ============================================================
 
     def _on_mousewheel_zoom(
@@ -1542,7 +1617,16 @@ class RayTracerApp:
             return
 
         try:
-            self.current_image.save(
+            image_to_save = self.current_image
+
+            if path.lower().endswith(
+                (".jpg", ".jpeg")
+            ):
+                image_to_save = (
+                    image_to_save.convert("RGB")
+                )
+
+            image_to_save.save(
                 path
             )
 
@@ -1558,7 +1642,7 @@ class RayTracerApp:
 
 
 # ================================================================
-# APPLICATION ENTRY POINT
+# ENTRY POINT
 # ================================================================
 
 if __name__ == "__main__":
