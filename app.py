@@ -43,6 +43,7 @@ class RayTracerApp:
 
         self.zoom_factor = 1.0
         self.is_rendering = False
+        self.max_workers = max(1, os.cpu_count() or 1)
 
         self._build_ui()
 
@@ -459,53 +460,42 @@ class RayTracerApp:
         # Workers
         # --------------------------------------------------------
 
-        ttk.Label(
-            controls,
-            text="Workers"
-        ).grid(
+        workers_label_frame = ttk.Frame(controls)
+
+        workers_label_frame.grid(
             row=row,
             column=0,
             sticky="w",
             pady=4
+        )
+
+        ttk.Label(
+            workers_label_frame,
+            text="Workers"
+        ).pack(
+            side="left"
+        )
+
+        ttk.Label(
+            workers_label_frame,
+            text=f" (max {self.max_workers})"
+        ).pack(
+            side="left"
         )
 
         self.workers_var = tk.IntVar(
-            value=max(
-                1,
-                (os.cpu_count() or 8) - 2
-            )
+            value=self.max_workers
         )
 
-        ttk.Entry(
+        self.workers_spinbox = ttk.Spinbox(
             controls,
-            textvariable=self.workers_var
-        ).grid(
-            row=row,
-            column=1,
-            sticky="ew",
-            pady=4
+            from_=1,
+            to=self.max_workers,
+            textvariable=self.workers_var,
+            width=10
         )
 
-        row += 1
-
-        ttk.Label(
-            controls,
-            text="Ray max depth"
-        ).grid(
-            row=row,
-            column=0,
-            sticky="w",
-            pady=4
-        )
-
-        self.max_depth_var = tk.IntVar(
-            value=3
-        )
-
-        ttk.Entry(
-            controls,
-            textvariable=self.max_depth_var
-        ).grid(
+        self.workers_spinbox.grid(
             row=row,
             column=1,
             sticky="ew",
@@ -516,7 +506,7 @@ class RayTracerApp:
 
         # ========================================================
         # PATH TRACING
-        # ========================================================
+        # ====================Workers must be at least 1====================================
 
         ttk.Separator(
             controls
@@ -983,9 +973,15 @@ class RayTracerApp:
                     "Resolution must be positive."
                 )
 
-            if workers <= 0:
+            if workers < 1:
                 raise ValueError(
                     "Workers must be at least 1."
+                )
+
+            if workers > self.max_workers:
+                raise ValueError(
+                    f"Workers cannot exceed the number of available "
+                    f"logical CPU threads ({self.max_workers})."
                 )
 
         except Exception as exc:
@@ -1041,8 +1037,9 @@ class RayTracerApp:
                 self.height_var.get()
             )
 
-            workers = int(
-                self.workers_var.get()
+            workers = max(
+                1,
+                min(workers, self.max_workers)
             )
 
             max_depth = int(
